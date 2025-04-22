@@ -72,6 +72,7 @@ CREATE TABLE reports (
 
 -- 📦 groups
 CREATE TABLE groups (
+<<<<<<< HEAD
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
@@ -89,6 +90,23 @@ CREATE TABLE group_members (
     joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     role ENUM('member', 'admin') DEFAULT 'member',
     PRIMARY KEY (group_id, user_id),
+=======
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    creator_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    group_type ENUM('chat', 'feed') NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 👥 group_memberships
+CREATE TABLE group_memberships (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    group_id INT NOT NULL,
+    user_id INT NOT NULL,
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+>>>>>>> fd10dce50f309fb5fc958862d6d3af6458afc2fb
     FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
