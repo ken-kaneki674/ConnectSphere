@@ -2,21 +2,21 @@
     RewriteEngine On
     RewriteBase /connectsphere/public/
     
-    # Redirect to public if accessing root
-    RewriteRule ^$ public/ [L]
+    # Redirection vers le fichier de modération
+    RewriteRule ^$ moderation.php [L]
     
-    # Remove trailing slash
+    # Suppression du slash final
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)/$ /$1 [L,R=301]
     
-    # Handle front controller
+    # Gestion du front controller
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ moderation.php?url=$1 [QSA,L]
 </IfModule>
 
 <IfModule mod_headers.c>
-    # Security headers
+    # En-têtes de sécurité
     Header set X-Content-Type-Options "nosniff"
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
