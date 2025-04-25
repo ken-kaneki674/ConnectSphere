@@ -1,0 +1,41 @@
+/* Styles pour les signalements */
+.report-btn, .block-user-btn {
+    cursor: pointer;
+}
+
+.report-btn:hover {
+    color: #F04747;
+}
+
+.block-user-btn:hover {
+    color: #faa61a;
+}
+
+/* Alertes */
+.alert {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1100;
+    min-width: 300px;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Tableau de modération */
+.admin-report-item {
+    transition: all 0.2s;
+}
+
+.admin-report-item:hover {
+    background-color: #f8f9fa;
+}
+
+.report-actions .btn {
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
