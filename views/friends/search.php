@@ -1,50 +1,48 @@
 <?php
-// Inclure l'en-tête ou tout autre fichier nécessaire
-require_once '../../config/database.php'; 
+session_start();
+$results = $_SESSION['search_results'] ?? [];
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Rechercher des utilisateurs</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Recherche d'amis</title>
 </head>
 <body>
-    <div class="container mt-5">
-        <h1>Rechercher des utilisateurs</h1>
 
-        <!-- Formulaire de recherche -->
-        <form method="POST" action="../../controllers/FriendController.php">
-            <div class="mb-3">
-                <label for="keyword" class="form-label">Entrez un pseudo ou un nom</label>
-                <input type="text" class="form-control" id="keyword" name="keyword" required>
-            </div>
-            <button type="submit" class="btn btn-primary" name="action" value="search_users">Rechercher</button>
-        </form>
+<h1>Recherche d'utilisateurs</h1>
 
-        <?php if (isset($results) && !empty($results)): ?>
-            <h2 class="mt-5">Résultats de la recherche</h2>
-            <div class="list-group">
-                <?php foreach ($results as $user): ?>
-                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                        <div class="d-flex align-items-center">
-                            <img src="<?= $user['profile_picture'] ?>" alt="Profil" class="rounded-circle" style="width: 40px; height: 40px; margin-right: 10px;">
-                            <span><?= htmlspecialchars($user['username']) ?></span>
-                        </div>
-                        <form method="POST" action="../../controllers/FriendController.php" class="d-inline">
-                            <button type="submit" class="btn btn-success btn-sm" name="action" value="send_request">Ajouter</button>
-                            <input type="hidden" name="receiver_id" value="<?= $user['id'] ?>">
-                        </form>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-        <?php elseif (isset($results)): ?>
-            <p>Aucun utilisateur trouvé.</p>
-        <?php endif; ?>
-    </div>
+<!-- Formulaire de recherche -->
+<form method="POST" action="../../controllers/FriendController.php">
+    <input type="hidden" name="action" value="search_users">
+    <input type="text" name="keyword" placeholder="Entrez un pseudo..." required>
+    <button type="submit">Rechercher</button>
+</form>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<hr>
+
+<!-- Affichage des résultats -->
+<h2>Résultats de la recherche :</h2>
+
+<?php if (!empty($results)): ?>
+    <ul>
+        <?php foreach ($results as $user): ?>
+            <li>
+                <?php echo htmlspecialchars($user['username']); ?>
+
+                <!-- Bouton pour envoyer une demande d'ami -->
+                <form method="POST" action="../../controllers/FriendController.php" style="display:inline;">
+                    <input type="hidden" name="action" value="send_request">
+                    <input type="hidden" name="receiver_id" value="<?php echo $user['id']; ?>">
+                    <button type="submit">Ajouter en ami</button>
+                </form>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+<?php else: ?>
+    <p>Aucun utilisateur trouvé.</p>
+<?php endif; ?>
+
 </body>
 </html>

@@ -1,9 +1,10 @@
 <?php
-require_once '../config/database.php';
-require_once '../models/User.php';
+require_once(__DIR__ . '/../config/database.php');
+require_once(__DIR__ . '/../models/User.php');
 session_start();
 
-$current_user_id = 1; // ⚠️ Remplacer par $_SESSION['user_id'] en prod
+// Remplacer ceci en production :
+$current_user_id = $_SESSION['user_id'] ?? 1;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
@@ -13,7 +14,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
             if (!empty($_POST['receiver_id'])) {
                 $receiver_id = (int) $_POST['receiver_id'];
 
-                // Vérifier si la demande existe déjà
                 $check = $pdo->prepare("SELECT * FROM friend_requests WHERE 
                     (sender_id = ? AND receiver_id = ?) OR 
                     (sender_id = ? AND receiver_id = ?)");
@@ -77,9 +77,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                   AND u.id != :user_id
             ");
             $stmt->execute(['user_id' => $current_user_id]);
+            $_SESSION['friends_list'] = $stmt->fetchAll();
+            header('Location: ../views/friends/list.php');
+            break;
 
-            $friends = $stmt->fetchAll();
-            include '../views/friends/list.php';
+        case 'view_requests':
+            $stmt = $pdo->prepare("
+                SELECT fr.id, u.id as user_id, u.username
+                FROM friend_requests fr
+                INNER JOIN users u ON u.id = fr.sender_id
+                WHERE fr.receiver_id = :user_id AND fr.status = 0
+            ");
+            $stmt->execute(['user_id' => $current_user_id]);
+            $_SESSION['friend_requests'] = $stmt->fetchAll();
+            header('Location: ../views/friends/requests.php');
             break;
 
         default:
