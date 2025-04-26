@@ -6,6 +6,23 @@ class User {
         $this->db = $db;
     }
 
+    public function login(string $email, string $password): array {
+        $user = $this->db->prepare("SELECT * FROM users WHERE email = ?");
+        $user->execute([$email]);
+        
+        if (!$user || !password_verify($password, $user['password_hash'])) {
+            return ['success' => false, 'message' => 'Identifiants incorrects'];
+        }
+        
+        return [
+            'success' => true,
+            'user' => [
+                'id' => $user['id'],
+                'email' => $user['email']
+            ]
+        ];
+    }
+
     public function register($username, $email, $password, $bio = null, $profilePicture = null) {
         // Vérifier si l'email existe déjà
         if ($this->emailExists($email)) {

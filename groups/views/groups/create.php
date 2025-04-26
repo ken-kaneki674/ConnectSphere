@@ -99,60 +99,50 @@
 
 <!-- Scripts spécifiques -->
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Aperçu de l'image
-    document.getElementById('groupCover').addEventListener('change', function(e) {
-        const preview = document.getElementById('coverPreview');
-        const file = e.target.files[0];
-        
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                preview.src = e.target.result;
-                preview.classList.remove('d-none');
-            }
-            reader.readAsDataURL(file);
-        }
-    });
+document.getElementById('createGroupForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
     
-    // Validation du formulaire
-    const form = document.getElementById('createGroupForm');
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    const form = e.target;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    try {
+        // Afficher un indicateur de chargement
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Création...';
         
-        if (!form.checkValidity()) {
-            e.stopPropagation();
-            form.classList.add('was-validated');
-            return;
+        const formData = new FormData(form);
+        const response = await fetch('/groups/create', {
+            method: 'POST',
+            body: formData
+        });
+        
+        // Vérifier le type de contenu avant de parser
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Réponse serveur invalide');
         }
         
-        const submitBtn = form.querySelector('button[type="submit"]');
-        const originalText = submitBtn.innerHTML;
+        const data = await response.json();
         
-        try {
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Création en cours...';
-            
-            const formData = new FormData(form);
-            const response = await fetch('api/groups/create.php', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await response.json();
-            
-            if (!response.ok) throw data;
-            
-            window.location.href = `?page=groups&action=view&id=${data.group_id}`;
-            
-        } catch (error) {
-            console.error(error);
-            alert(error.message || 'Une erreur est survenue');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
+        if (!response.ok) {
+            throw new Error(data.error || 'Erreur inconnue');
         }
-    });
+        
+        // Redirection après succès
+        window.location.href = data.redirect;
+        
+    } catch (error) {
+        // Réafficher le bouton
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        
+        // Afficher l'erreur
+        alert(error.message);
+        
+        // Journaliser l'erreur complète en développement
+        console.error('Erreur détaillée:', error);
+    }
 });
 </script>
 

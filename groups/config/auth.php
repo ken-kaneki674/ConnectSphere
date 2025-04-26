@@ -1,32 +1,42 @@
 <?php
-function generateCsrfToken() {
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-    return $_SESSION['csrf_token'];
+declare(strict_types=1);
+
+// Vérification de la session
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
 }
 
-function verifyCsrfToken($token) {
+/**
+ * Vérifie le token CSRF
+ */
+function verifyCsrfToken(string $token): bool {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
-function isLoggedIn() {
-    // 1. Vérification de la session
-    if (isset($_SESSION['user_id'])) {
-        return true;
+
+/**
+ * Vérifie si l'utilisateur est connecté
+ */
+function isLoggedIn(): bool {
+    if (empty($_SESSION['user_id'])) {
+        return false;
     }
     
-    // 2. Vérification du cookie "Se souvenir de moi"
-    if (isset($_COOKIE['remember_token'])) {
-        require_once '../models/UserToken.php';
-        $tokenModel = new UserToken($db);
-        $userId = $tokenModel->verifyToken($_COOKIE['remember_token']);
-        
-        if ($userId) {
-            $_SESSION['user_id'] = $userId;
-            return true;
-        }
+    // Vérification que l'ID est bien numérique
+    if (!is_numeric($_SESSION['user_id'])) {
+        unset($_SESSION['user_id']);
+        return false;
     }
     
-    return false;
+    return true;
 }
 
+/**
+ * Redirection si non connecté
+ */
+function requireAuth(): void {
+    if (!isLoggedIn()) {
+        $_SESSION['login_redirect'] = $_SERVER['REQUEST_URI'];
+        header('Location: /login');
+        exit;
+    }
+}
