@@ -46,6 +46,15 @@ $user = $_SESSION['user'];
         <div class="contacts">
             <h5>🧑‍🤝‍🧑 Contacts</h5>
             <div id="contacts"></div>
+
+            <!-- ✅ Formulaire pour démarrer une nouvelle conversation -->
+            <form id="startConversationForm" class="mt-3">
+                <div class="input-group">
+                    <input type="text" id="new_contact" name="new_contact" class="form-control" placeholder="Nom d'utilisateur..." required>
+                    <button type="submit" class="btn btn-secondary">Démarrer</button>
+                </div>
+                <div id="startConvMsg" class="mt-1 text-danger small"></div>
+            </form>
         </div>
 
         <div class="flex-grow-1">
@@ -85,6 +94,7 @@ $(document).on("click", ".contact-item", function() {
     loadMessages();
 });
 
+// ✅ Envoi de message
 $("#sendMessageForm").on("submit", function(e) {
     e.preventDefault();
     $.post("send_message.php", $(this).serialize(), function() {
@@ -93,6 +103,18 @@ $("#sendMessageForm").on("submit", function(e) {
     });
 });
 
+// ✅ Démarrer une conversation
+$("#startConversationForm").on("submit", function(e) {
+    e.preventDefault();
+    $.post("start_conversation.php", $(this).serialize(), function(response) {
+        $("#startConvMsg").text(response);
+        loadContacts();
+        $("#startConversationForm")[0].reset();
+        setTimeout(() => $("#startConvMsg").text(''), 4000);
+    });
+});
+
+// Rafraîchissements automatiques
 setInterval(loadMessages, 1500);
 setInterval(loadContacts, 10000);
 loadContacts();
