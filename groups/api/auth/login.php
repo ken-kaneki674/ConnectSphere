@@ -8,6 +8,13 @@ require_once __DIR__ . '/../../models/UserToken.php';
 
 header('Content-Type: application/json');
 
+// Initialiser la réponse
+$response = [
+    'success' => false,
+    'message' => 'Erreur inconnue',
+    'redirect' => null
+];
+
 try {
     // 1. Vérification méthode HTTP
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -44,14 +51,15 @@ try {
 
     if (!$authResult['success']) {
         http_response_code(401);
-        echo json_encode($authResult);
+        $response['message'] = $authResult['message'] ?? 'Identifiants incorrects';
+        echo json_encode($response);
         exit;
     }
 
     // 5. Création de la session
     $_SESSION['user_id'] = $authResult['user']['id'];
     $_SESSION['user_email'] = $authResult['user']['email'];
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32)); // Régénérer le token après login
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 
     // 6. Gestion du "Se souvenir de moi"
     if ($remember) {
@@ -71,26 +79,28 @@ try {
             ]
         );
 
-        // Stockage du token en base
         $tokenModel = new UserToken(getDBConnection());
         $tokenModel->createToken($authResult['user']['id'], $token, $expires);
     }
 
     // 7. Réponse JSON
-    echo json_encode([
-        'success' => true,
-        'redirect' => $_SESSION['login_redirect'] ?? '/',
-        'user' => [
-            'id' => $authResult['user']['id'],
-            'email' => $authResult['user']['email']
-        ]
-    ]);
+    $response['success'] = true;
+    $response['message'] = 'Connexion réussie';
+    $response['redirect'] = $_SESSION['login_redirect'] ?? '/home';
+    $response['user'] = [
+        'id' => $authResult['user']['id'],
+        'email' => $authResult['user']['email']
+    ];
+
+    echo json_encode($response);
 
 } catch (InvalidArgumentException $e) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    $response['message'] = $e->getMessage();
+    echo json_encode($response);
 } catch (RuntimeException $e) {
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    $response['message'] = $e->getMessage();
     error_log('Login error: ' . $e->getMessage());
+    echo json_encode($response);
 }

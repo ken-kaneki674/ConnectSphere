@@ -1,6 +1,6 @@
 <?php
 // Vérifie si l'utilisateur est déjà connecté
-require_once '../../config/auth.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config/auth.php';
 if (isLoggedIn()) {
     header('Location: /home');
     exit;
@@ -14,11 +14,11 @@ if (isLoggedIn()) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Connexion - ConnectSphere</title>
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/assets/css/bootstrap.css" rel="stylesheet">
     <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/assets/css/all.min.css">
     <!-- CSS personnalisé -->
-    <link href="../assets/css/auth.css" rel="stylesheet">
+    <link href="/assets/css/auth.css" rel="stylesheet">
 </head>
 <body class="auth-page">
     <div class="container">
@@ -31,7 +31,7 @@ if (isLoggedIn()) {
                     </div>
                     <div class="card-body p-4">
                         <!-- Messages d'erreur/succès -->
-                        <div id="auth-message" class="alert d-none"></div>
+                        <div id="auth-message" class="alert alert-danger d-none"></div>
                         
                         <form id="loginForm" novalidate>
                             <!-- Token CSRF -->
@@ -108,11 +108,12 @@ if (isLoggedIn()) {
     </div>
 
     <!-- JavaScript -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="../assets/js/auth.js"></script>
+    <script src="/assets/js/jquery.js"></script>
+    <script src="/assets/js/bootstrap.js"></script>
     <script>
     $(document).ready(function() {
+        console.log('Document ready');
+        
         // Afficher/masquer le mot de passe
         $('.toggle-password').click(function() {
             const icon = $(this).find('i');
@@ -126,48 +127,61 @@ if (isLoggedIn()) {
             }
         });
 
+        // Fonction pour afficher les erreurs
+        function showError(message) {
+            const alert = $('#auth-message');
+            alert.removeClass('d-none').addClass('alert-danger');
+            alert.html(`<i class="fas fa-exclamation-circle me-2"></i>${message}`);
+            alert[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
         // Validation du formulaire
-        $('#loginForm').submit(function(e) {
+        $('#loginForm').on('submit', function(e) {
+            console.log('Form submission intercepted');
             e.preventDefault();
+            
             const form = $(this);
+            const btn = $('#loginBtn');
             
             // Validation frontale
             if (!form[0].checkValidity()) {
+                console.log('Form validation failed');
                 e.stopPropagation();
                 form.addClass('was-validated');
                 return;
             }
 
-            // Désactiver le bouton pendant la requête
-            const btn = $('#loginBtn');
+            // Désactiver le bouton
             btn.prop('disabled', true);
             btn.find('.spinner-border').removeClass('d-none');
             btn.find('.btn-text').text('Connexion...');
 
             // Envoyer les données
             $.ajax({
-                url: '../api/auth/login.php',
+                url: '/api/auth/login.php',
                 type: 'POST',
                 data: form.serialize(),
                 dataType: 'json',
                 success: function(response) {
+                    console.log('API response:', response);
                     if (response.success) {
-                        // Redirection après connexion réussie
                         window.location.href = response.redirect || '/home';
                     } else {
-                        // Afficher l'erreur
-                        const alert = $('#auth-message');
-                        alert.removeClass('d-none alert-success').addClass('alert-danger');
-                        alert.html(`<i class="fas fa-exclamation-circle me-2"></i>${response.message}`);
-                        // Réactiver le bouton
-                        btn.prop('disabled', false);
-                        btn.find('.spinner-border').addClass('d-none');
-                        btn.find('.btn-text').text('Se connecter');
+                        showError(response.message || 'Identifiants incorrects');
                     }
                 },
                 error: function(xhr) {
-                    $('#auth-message').removeClass('d-none alert-success').addClass('alert-danger')
-                        .html('<i class="fas fa-exclamation-circle me-2"></i>Erreur serveur. Veuillez réessayer.');
+                    console.log('API error:', xhr);
+                    let message = 'Erreur lors de la connexion';
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        message = response.message || message;
+                    } catch (e) {
+                        message = xhr.statusText || message;
+                    }
+                    showError(message);
+                },
+                complete: function() {
                     btn.prop('disabled', false);
                     btn.find('.spinner-border').addClass('d-none');
                     btn.find('.btn-text').text('Se connecter');
