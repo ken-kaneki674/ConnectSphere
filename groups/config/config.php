@@ -4,6 +4,7 @@ define('DB_HOST', 'localhost');
 define('DB_NAME', 'connectsphere');
 define('DB_USER', 'root');
 define('DB_PASS', '');
+define('ENVIRONMENT', 'development'); 
 
 // Configuration de l'application
 define('APP_ROOT', dirname(dirname(__FILE__)));

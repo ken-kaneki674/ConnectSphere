@@ -1,0 +1,10 @@
+# Empêcher l'exécution de PHP
+php_flag engine off
+
+# Autoriser seulement les images
+<FilesMatch "\.(jpg|jpeg|png)$">
+    Allow from all
+</FilesMatch>
+
+# Empêcher le listing des fichiers
+Options -Indexes

@@ -25,7 +25,7 @@ if (!$user) {
                     <p class="text-muted"><?= htmlspecialchars($user['bio'] ?? 'Pas de bio') ?></p>
                     
                     <?php if ($isOwnProfile): ?>
-                        <a href="?page=profile&action=edit" class="btn btn-outline-primary btn-block">
+                        <a href="/profile&action=edit" class="btn btn-outline-primary btn-block">
                             <i class="fas fa-edit"></i> Modifier le profil
                         </a>
                     <?php else: ?>
@@ -95,7 +95,7 @@ if (!$user) {
                                 <!-- Les publications seront chargées ici via AJAX -->
                                 <div class="text-center">
                                     <div class="spinner-border text-primary" role="status">
-                                        <span class="sr-only">Chargement...</span>
+                                        <span class="sr-only"></span>
                                     </div>
                                 </div>
                             </div>

@@ -12,13 +12,13 @@ $isLoggedIn = isset($_SESSION['user_id']);
         <?php if ($isLoggedIn): ?>
             <div class="row">
                 <div class="col-md-4 mb-3">
-                    <a href="?page=groups" class="btn btn-primary btn-block py-3">
+                    <a href="/groups" class="btn btn-primary btn-block py-3">
                         <i class="fas fa-users fa-2x mb-2"></i><br>
                         Mes Groupes
                     </a>
                 </div>
                 <div class="col-md-4 mb-3">
-                    <a href="?page=profile" class="btn btn-success btn-block py-3">
+                    <a href="/profile" class="btn btn-success btn-block py-3">
                         <i class="fas fa-user-circle fa-2x mb-2"></i><br>
                         Mon Profil
                     </a>
@@ -36,8 +36,8 @@ $isLoggedIn = isset($_SESSION['user_id']);
                     <div class="card">
                         <div class="card-body">
                             <h5 class="card-title">Commencez dès maintenant</h5>
-                            <a href="?page=register" class="btn btn-primary btn-lg mr-3">S'inscrire</a>
-                            <a href="?page=login" class="btn btn-outline-secondary btn-lg">Se connecter</a>
+                            <a href="/register" class="btn btn-primary btn-lg mr-3">S'inscrire</a>
+                            <a href="/login" class="btn btn-outline-secondary btn-lg">Se connecter</a>
                         </div>
                     </div>
                 </div>
@@ -54,7 +54,7 @@ $isLoggedIn = isset($_SESSION['user_id']);
                         <!-- Les activités seront chargées ici via AJAX -->
                         <div class="text-center">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="sr-only">Chargement...</span>
+                                <span class="sr-only"></span>
                             </div>
                         </div>
                     </div>
