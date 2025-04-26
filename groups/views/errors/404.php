@@ -30,7 +30,7 @@ http_response_code(404);
                         </li>
                         <li class="mb-2">
                             <i class="fas fa-home me-2 text-primary"></i>
-                            <a href="/" class="text-decoration-none">Retour à la page d'accueil</a>
+                            <a href="/home" class="text-decoration-none">Retour à la page d'accueil</a>
                         </li>
                         <li>
                             <i class="fas fa-envelope me-2 text-primary"></i>
@@ -55,7 +55,7 @@ http_response_code(404);
 
             <!-- Boutons d'action -->
             <div class="d-flex justify-content-center gap-3">
-                <a href="/" class="btn btn-primary px-4">
+                <a href="/home" class="btn btn-primary px-4">
                     <i class="fas fa-home me-2"></i>Accueil
                 </a>
                 <?php if (isset($_SESSION['user_id'])): ?>

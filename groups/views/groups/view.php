@@ -1,18 +1,64 @@
-<?php 
+<?php
 require_once __DIR__ . '/../../templates/header.php';
 require_once __DIR__ . '/../../config/auth.php';
+require_once __DIR__ . '/../../config/config.php'; // connexion à la base de données
 
 // Vérification de la session utilisateur
 if (!isset($_SESSION['user_id'])) {
     header('Location: /login');
     exit;
 }
+
+// Récupération de l'ID du groupe depuis l'URL
+$groupId = $_GET['id'] ?? null;
+
+if (!$groupId) {
+    $error = "Aucun groupe sélectionné.";
+} else {
+    try {
+        // 1. Charger les informations du groupe
+        $stmt = $pdo->prepare('SELECT * FROM groups WHERE id = ?');
+        $stmt->execute([$groupId]);
+        $group = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$group) {
+            $error = "Groupe introuvable.";
+        } else {
+            // 2. Vérifier si l'utilisateur est membre du groupe
+            $stmt = $pdo->prepare('SELECT * FROM group_members WHERE group_id = ? AND user_id = ?');
+            $stmt->execute([$groupId, $_SESSION['user_id']]);
+            $isMember = $stmt->rowCount() > 0;
+
+            // 3. Vérifier si l'utilisateur peut éditer (admin du groupe)
+            $canEdit = false;
+            if ($isMember) {
+                $memberData = $stmt->fetch(PDO::FETCH_ASSOC);
+                $canEdit = $memberData['role'] === 'admin';
+            }
+
+            // 4. Charger les membres du groupe
+            $stmt = $pdo->prepare('
+                SELECT u.id as user_id, u.username, u.profile_picture, gm.role
+                FROM users u
+                JOIN group_members gm ON u.id = gm.user_id
+                WHERE gm.group_id = ?
+            ');
+            $stmt->execute([$groupId]);
+            $members = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+    } catch (PDOException $e) {
+        $error = "Erreur lors du chargement du groupe : " . $e->getMessage();
+    }
+}
 ?>
 
+<!-- Ton HTML ici -->
 <div class="container mt-4">
     <?php if (isset($error)): ?>
         <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
     <?php elseif (isset($group) && isset($members)): ?>
+
+
         <div class="row">
             <div class="col-md-8">
                 <!-- En-tête du groupe -->

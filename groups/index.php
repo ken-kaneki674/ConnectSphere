@@ -43,6 +43,7 @@ $routes = [
         'home' => ['view' => 'views/home.php', 'title' => 'Accueil'],
         'login' => ['view' => 'views/auth/login.php', 'title' => 'Connexion'],
         'register' => ['view' => 'views/auth/register.php', 'title' => 'Inscription'],
+        'logout' => ['view' => 'views/auth/logout.php', 'title' => 'Déconnexion'],
     ],
     'protected' => [
         'profile' => [

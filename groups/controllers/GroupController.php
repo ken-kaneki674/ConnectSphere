@@ -75,7 +75,7 @@ class GroupController {
             $filter = $_GET['filter'] ?? 'all';
 
             if ($filter === 'my' && $currentUserId) {
-                $groups = $this->groupModel->getUserGroups($currentUserId, true);
+                $groups = $this->groupModel->getUserGroups((int) $currentUserId, true);
             } elseif ($filter === 'popular') {
                 $groups = $this->groupModel->search('', null, 50);
                 usort($groups, fn($a, $b) => $b['member_count'] <=> $a['member_count']);

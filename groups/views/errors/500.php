@@ -25,7 +25,7 @@
                             </div>
                         <?php endif; ?>
 
-                        <a href="/" class="btn btn-primary mt-3">
+                        <a href="/home" class="btn btn-primary mt-3">
                             <i class="fas fa-home"></i> Retour à l'accueil
                         </a>
                     </div>

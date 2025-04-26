@@ -23,7 +23,14 @@
 }
 </style>
 <?php
-// Define the truncate function
+$type = $_GET['type'] ?? '';
+$search = $_GET['q'] ?? '';
+$currentPage = isset($_GET['p']) ? (int)$_GET['p'] : 1;
+
+// Sécurité : définir $groups et $totalPages si pas encore définis
+$groups = $groups ?? [];
+$totalPages = $totalPages ?? 1;
+
 function truncate($text, $length) {
     return strlen($text) > $length ? substr($text, 0, $length) . '...' : $text;
 }
@@ -89,7 +96,7 @@ function truncate($text, $length) {
                                     </span>
                                 <?php endif; ?>
                                 <span class="badge bg-info">
-                                    <?= ucfirst($group['type']) ?>
+                                    <?= isset($group['type']) ? ucfirst($group['type']) : 'Type inconnu' ?>
                                 </span>
                             </div>
                         </div>
@@ -109,10 +116,10 @@ function truncate($text, $length) {
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="text-muted">
                                     <i class="fas fa-users"></i> 
-                                    <?= $group['member_count'] ?> membres
+                                    <?= isset($group['member_count']) ? $group['member_count'] : 0 ?> membres
                                 </small>
                                 
-                                <?php if ($group['user_role']): ?>
+                                <?php if (isset($group['user_role']) && $group['user_role']): ?>
                                     <span class="badge bg-<?= $group['user_role'] === 'admin' ? 'primary' : 'secondary' ?>">
                                         <?= $group['user_role'] === 'admin' ? 'Admin' : 'Membre' ?>
                                     </span>

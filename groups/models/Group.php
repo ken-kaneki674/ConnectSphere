@@ -80,6 +80,34 @@ class Group {
         return $group;
     }
 
+    public function countFilteredGroups($userId, $search = '', $filter = '', $type = '')
+{
+    $sql = "SELECT COUNT(*) as total FROM groups WHERE user_id = :userId";
+    $params = ['userId' => $userId];
+
+    if (!empty($search)) {
+        $sql .= " AND (name LIKE :search OR description LIKE :search)";
+        $params['search'] = '%' . $search . '%';
+    }
+
+    if (!empty($filter)) {
+        $sql .= " AND category = :filter";
+        $params['filter'] = $filter;
+    }
+
+    if (!empty($type)) {
+        $sql .= " AND type = :type";
+        $params['type'] = $type;
+    }
+
+    $stmt = $this->db->prepare($sql);
+    $stmt->execute($params);
+    $result = $stmt->fetch();
+
+    return $result['total'] ?? 0;
+}
+
+
     public function getUserGroups(int $userId, bool $includePrivate = false): array {
         $sql = "
             SELECT g.*, gm.role 
