@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/db.php';
 session_start();
+
 if (!isset($_SESSION['user'])) exit;
 
 $userId = $_SESSION['user']['id'];

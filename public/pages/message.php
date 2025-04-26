@@ -43,15 +43,13 @@ $user = $_SESSION['user'];
     <h3 class="mb-4 text-center">📩 Messagerie ConnectSphere</h3>
 
     <div class="chat-container">
-        <!-- Contacts -->
         <div class="contacts">
             <h5>🧑‍🤝‍🧑 Contacts</h5>
             <div id="contacts"></div>
         </div>
 
-        <!-- Chat -->
         <div class="flex-grow-1">
-            <div id="chat-box" class="chat-box mb-3">Sélectionnez un contact pour démarrer une conversation.</div>
+            <div id="chat-box" class="chat-box mb-3">Sélectionnez un contact pour discuter.</div>
             <form id="sendMessageForm" class="d-none">
                 <input type="hidden" name="receiver_id" id="receiver_id">
                 <div class="input-group">
@@ -66,14 +64,12 @@ $user = $_SESSION['user'];
 <script>
 let currentReceiver = null;
 
-// Affiche la liste des contacts
 function loadContacts() {
     $.get("fetch_contacts.php", function(data) {
         $("#contacts").html(data);
     });
 }
 
-// Charge les messages
 function loadMessages() {
     if (!currentReceiver) return;
     $.get("fetch_messages.php?receiver_id=" + currentReceiver, function(data) {
@@ -82,7 +78,6 @@ function loadMessages() {
     });
 }
 
-// Lorsqu'on clique sur un contact
 $(document).on("click", ".contact-item", function() {
     currentReceiver = $(this).data("id");
     $("#receiver_id").val(currentReceiver);
@@ -90,7 +85,6 @@ $(document).on("click", ".contact-item", function() {
     loadMessages();
 });
 
-// Envoi de message
 $("#sendMessageForm").on("submit", function(e) {
     e.preventDefault();
     $.post("send_message.php", $(this).serialize(), function() {
@@ -99,11 +93,8 @@ $("#sendMessageForm").on("submit", function(e) {
     });
 });
 
-// Rafraîchissement automatique
 setInterval(loadMessages, 1500);
-setInterval(loadContacts, 10000); // recharge contacts toutes les 10s
-
-// Chargement initial
+setInterval(loadContacts, 10000);
 loadContacts();
 </script>
 </body>

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/db.php';
 session_start();
+
 if (!isset($_SESSION['user'])) exit;
 
 $userId = $_SESSION['user']['id'];
@@ -9,7 +10,6 @@ $content = trim($_POST['content'] ?? '');
 
 if (empty($content)) exit;
 
-// Vérifie ou crée la conversation
 $stmt = $pdo->prepare("
     SELECT * FROM conversations 
     WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
