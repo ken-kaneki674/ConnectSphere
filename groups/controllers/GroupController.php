@@ -361,4 +361,133 @@ class GroupController {
     private function logError(Exception $e): void {
         error_log('[' . date('Y-m-d H:i:s') . '] ' . $e->getMessage() . "\n" . $e->getTraceAsString());
     }
-}
+        
+        
+        public function editForm(int $groupId): void {
+            $this->checkAuth();
+            
+            try {
+                if (!$this->canUserEditGroup($groupId)) {
+                    throw new RuntimeException('Permissions insuffisantes');
+                }
+                
+                $group = $this->groupModel->getById($groupId);
+                $this->render('groups/edit', ['group' => $group]);
+                
+            } catch (Exception $e) {
+                $this->redirectWithError("/groups/view/$groupId", $e->getMessage());
+            }
+        }
+    
+        /**
+         * Traite la mise à jour d'un groupe
+         */
+        public function update(int $groupId): void {
+            $this->checkAuth();
+            $this->checkCsrfToken();
+            
+            try {
+                if (!$this->canUserEditGroup($groupId)) {
+                    throw new RuntimeException('Permissions insuffisantes');
+                }
+                
+                $coverImage = $this->handleCoverImageUpload($_FILES['cover_image'] ?? null);
+                
+                $data = [
+                    'name' => trim($_POST['name']),
+                    'description' => trim($_POST['description']),
+                    'group_type' => $_POST['type'],
+                    'is_private' => isset($_POST['is_private']),
+                    'cover_image' => $coverImage
+                ];
+                
+                $success = $this->groupModel->update($groupId, $data);
+                
+                if ($success) {
+                    $this->redirectWithSuccess(
+                        "/groups/view/$groupId", 
+                        'Groupe mis à jour avec succès'
+                    );
+                } else {
+                    throw new RuntimeException('Échec de la mise à jour du groupe');
+                }
+                
+            } catch (Exception $e) {
+                $this->redirectWithError("/groups/edit/$groupId", $e->getMessage());
+            }
+        }
+    
+        // ... (autres méthodes restent similaires avec des améliorations mineures)
+    
+        /**
+         * Gère l'invitation d'un membre
+         */
+        public function invite(int $groupId): void {
+            $this->checkAuth();
+            $this->checkCsrfToken();
+            
+            try {
+                if (!$this->canUserEditGroup($groupId)) {
+                    throw new RuntimeException('Permissions insuffisantes');
+                }
+                
+                $email = filter_var($_POST['email'], FILTER_VALIDATE_EMAIL);
+                if (!$email) {
+                    throw new InvalidArgumentException('Email invalide');
+                }
+                
+                $user = $this->userModel->findByEmail($email);
+                if (!$user) {
+                    throw new RuntimeException('Utilisateur non trouvé');
+                }
+                
+                // Vérifier si l'utilisateur est déjà membre
+                if ($this->groupMemberModel->isMember($groupId, $user['id'])) {
+                    throw new RuntimeException('Cet utilisateur est déjà membre du groupe');
+                }
+                
+                // Envoyer l'invitation
+                $this->groupMemberModel->addMember($groupId, $user['id']);
+                
+                // Ici vous pourriez aussi envoyer une notification email
+                // $this->sendInvitationEmail($user['email'], $groupId);
+                
+                $this->redirectWithSuccess(
+                    "/groups/view/$groupId",
+                    'Invitation envoyée avec succès'
+                );
+                
+            } catch (Exception $e) {
+                $this->redirectWithError("/groups/view/$groupId", $e->getMessage());
+            }
+        }
+    
+        /**
+         * Gère la promotion/démotion d'un membre
+         */
+        public function changeRole(int $groupId, int $memberId): void {
+            $this->checkAuth();
+            $this->checkCsrfToken();
+            
+            try {
+                if (!$this->canUserEditGroup($groupId)) {
+                    throw new RuntimeException('Permissions insuffisantes');
+                }
+                
+                $newRole = $_POST['role'] ?? 'member';
+                $success = $this->groupMemberModel->changeRole($groupId, $memberId, $newRole);
+                
+                if ($success) {
+                    $this->redirectWithSuccess(
+                        "/groups/view/$groupId",
+                        'Rôle mis à jour avec succès'
+                    );
+                } else {
+                    throw new RuntimeException('Échec de la mise à jour du rôle');
+                }
+                
+            } catch (Exception $e) {
+                $this->redirectWithError("/groups/view/$groupId", $e->getMessage());
+            }
+        }
+    }

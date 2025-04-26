@@ -133,4 +133,54 @@ class GroupMember {
         
         return (int)$stmt->fetchColumn();
     }
+    public function canEditGroup(int $groupId, int $userId): bool {
+        $group = $this->getGroup($groupId);
+        if (!$group) {
+            return false;
+        }
+        
+        // Le créateur peut toujours éditer
+        if ($group['creator_id'] === $userId) {
+            return true;
+        }
+        
+        // Vérifier les rôles admin/moderator
+        return $this->hasRole($groupId, $userId, ['admin', 'moderator']);
+    }
+
+    /**
+     * Récupère les informations de base d'un groupe
+     */
+    private function getGroup(int $groupId): ?array {
+        $stmt = $this->db->prepare("SELECT id, creator_id FROM groups WHERE id = ?");
+        $stmt->execute([$groupId]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /**
+     * Récupère le rôle d'un membre dans un groupe
+     */
+    public function getMemberRole(int $groupId, int $userId): ?string {
+        $stmt = $this->db->prepare("
+            SELECT role FROM group_members 
+            WHERE group_id = ? AND user_id = ?
+        ");
+        $stmt->execute([$groupId, $userId]);
+        return $stmt->fetchColumn() ?: null;
+    }
+
+    /**
+     * Supprime tous les membres d'un groupe (avant suppression du groupe)
+     */
+    public function removeAllMembers(int $groupId): bool {
+        $stmt = $this->db->prepare("DELETE FROM group_members WHERE group_id = ?");
+        return $stmt->execute([$groupId]);
+    }
+
+    /**
+     * Vérifie si un utilisateur peut supprimer un membre d'un groupe
+     */
+    public function canRemoveMember(int $groupId, int $userId): bool {
+        return $this->hasRole($groupId, $userId, ['admin', 'moderator']);
+    }
 }

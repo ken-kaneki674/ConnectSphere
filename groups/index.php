@@ -40,6 +40,7 @@ $param = $segments[2] ?? null;
 // 6. Définition des routes
 $routes = [
     'public' => [
+        '' => ['view' => 'views/home.php', 'title' => 'Accueil'],
         'home' => ['view' => 'views/home.php', 'title' => 'Accueil'],
         'login' => ['view' => 'views/auth/login.php', 'title' => 'Connexion'],
         'register' => ['view' => 'views/auth/register.php', 'title' => 'Inscription'],

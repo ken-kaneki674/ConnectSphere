@@ -83,4 +83,16 @@ class User {
         $stmt->execute([$id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Finds a user by their email address.
+     */
+    public function findByEmail(string $email): ?array {
+        // Example implementation: Replace with actual database query logic
+        $query = "SELECT * FROM users WHERE email = :email LIMIT 1";
+        $stmt = $this->db->prepare($query);
+        $stmt->bindParam(':email', $email, PDO::PARAM_STR);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
 }

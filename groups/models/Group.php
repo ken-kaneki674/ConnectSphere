@@ -207,28 +207,31 @@ private function deleteGroupMessages(int $groupId): void {
     $stmt->execute([$groupId]);
 }
 
-    public function update(int $groupId, array $data): bool {
-        $this->validateInput($data['name'] ?? '', $data['description'] ?? '', $data['type'] ?? '');
+    public function removeMember(int $groupId, int $userId): bool {
+        $stmt = $this->db->prepare("
+            DELETE FROM group_members 
+            WHERE group_id = :group AND user_id = :user
+        ");
         
-        $sql = "UPDATE groups SET ";
-        $updates = [];
-        $params = [':id' => $groupId];
+        return $stmt->execute([
+            ':group' => $groupId,
+            ':user'  => $userId
+        ]);
+    }
+    public function changeRole(int $groupId, int $userId, string $newRole): bool {
+        $this->validateRole($newRole);
         
-        foreach (['name', 'description', 'group_type', 'is_private', 'cover_image'] as $field) {
-            if (array_key_exists($field, $data)) {
-                $updates[] = "$field = :$field";
-                $params[":$field"] = $field === 'is_private' ? (int)$data[$field] : $data[$field];
-            }
-        }
+        $stmt = $this->db->prepare("
+            UPDATE group_members 
+            SET role = :role 
+            WHERE group_id = :group AND user_id = :user
+        ");
         
-        if (empty($updates)) {
-            return false;
-        }
-        
-        $sql .= implode(', ', $updates) . " WHERE id = :id";
-        
-        $stmt = $this->db->prepare($sql);
-        return $stmt->execute($params);
+        return $stmt->execute([
+            ':role'  => $newRole,
+            ':group' => $groupId,
+            ':user'  => $userId
+        ]);
     }
 
     // === Private Methods ===
@@ -299,5 +302,94 @@ private function deleteGroupMessages(int $groupId): void {
         $stmt->execute($params);
         
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+    public function update(int $groupId, array $data): bool {
+        $this->validateInput($data['name'] ?? '', $data['description'] ?? '', $data['group_type'] ?? '');
+        
+        try {
+            $this->db->beginTransaction();
+            
+            $sql = "UPDATE groups SET ";
+            $updates = [];
+            $params = [':id' => $groupId];
+            
+            foreach (['name', 'description', 'group_type', 'is_private'] as $field) {
+                if (array_key_exists($field, $data)) {
+                    $updates[] = "$field = :$field";
+                    $params[":$field"] = $field === 'is_private' ? (int)$data[$field] : $data[$field];
+                }
+            }
+            
+            // Gestion spéciale pour l'image de couverture
+            if (array_key_exists('cover_image', $data)) {
+                // Récupérer l'ancienne image pour la supprimer
+                $oldImage = $this->getCoverImage($groupId);
+                
+                if ($oldImage && $data['cover_image']) {
+                    $this->deleteCoverImage($oldImage);
+                }
+                
+                $updates[] = "cover_image = :cover_image";
+                $params[':cover_image'] = $data['cover_image'];
+            }
+            
+            if (empty($updates)) {
+                return false;
+            }
+            
+            $sql .= implode(', ', $updates) . " WHERE id = :id";
+            
+            $stmt = $this->db->prepare($sql);
+            $success = $stmt->execute($params);
+            
+            $this->db->commit();
+            return $success;
+            
+        } catch (PDOException $e) {
+            $this->db->rollBack();
+            throw new RuntimeException("Group update failed: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Récupère l'image de couverture d'un groupe
+     */
+    private function getCoverImage(int $groupId): ?string {
+        $stmt = $this->db->prepare("SELECT cover_image FROM groups WHERE id = ?");
+        $stmt->execute([$groupId]);
+        return $stmt->fetchColumn() ?: null;
+    }
+
+    /**
+     * Supprime physiquement l'image de couverture
+     */
+    private function deleteCoverImage(string $filename): void {
+        $path = __DIR__ . '/../../public/uploads/groups/' . $filename;
+        if (file_exists($path)) {
+            unlink($path);
+        }
+    }
+
+    /**
+     * Récupère les groupes suggérés pour un utilisateur
+     */
+    public function getSuggestedGroups(int $userId, int $limit = 5): array {
+        $sql = "
+            SELECT g.*, COUNT(gm.user_id) as member_count
+            FROM groups g
+            LEFT JOIN group_members gm ON g.id = gm.group_id
+            WHERE g.id NOT IN (
+                SELECT group_id FROM group_members WHERE user_id = ?
+            )
+            AND g.is_private = false
+            GROUP BY g.id
+            ORDER BY member_count DESC
+            LIMIT ?
+        ";
+        
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$userId, $limit]);
+        
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 }
