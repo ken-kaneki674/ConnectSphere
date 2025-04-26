@@ -7,8 +7,8 @@ require_once '../config/database.php';
 
 // Inclure les modèles
 require_once '../models/Post.php';
-require_once '../models/Comment.php';
-require_once '../models/Like.php';
+require_once '../models/add_Comment.php';
+require_once '../models/add_Like.php';
 
 // Inclure le contrôleur pour gérer l'affichage des publications
 require_once '../controllers/PostController.php';

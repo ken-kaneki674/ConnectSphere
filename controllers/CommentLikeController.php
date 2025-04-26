@@ -1,8 +1,8 @@
 <?php
 // controllers/CommentLikeController.php
 require_once __DIR__ . '/../config/database.php';
-require_once __DIR__ . '/../models/Comment.php';
-require_once __DIR__ . '/../models/Like.php';
+require_once __DIR__ . '/../models/add_Comment.php';
+require_once __DIR__ . '/../models/add_Like.php';
 
 session_start();
 
