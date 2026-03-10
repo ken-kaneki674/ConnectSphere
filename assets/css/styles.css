@@ -1,1 +1,7 @@
-Commande ECHO activ‚e.
+.like-btn .bi-heart-fill {
+    color: #F04747; /* Rouge pour like actif */
+}
+.comments-section {
+    border-top: 1px solid #99AAB5;
+    padding-top: 1rem;
+}
