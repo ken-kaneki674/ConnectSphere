@@ -46,3 +46,7 @@ composer.lock
 # Cache
 .cache/
 .temp/
+
+# Outils locaux (agents IA, prévisualisation)
+.github/
+.claude/
