@@ -1,0 +1,138 @@
+<?php
+require_once __DIR__ . '/../../includes/functions.php';
+
+if (!isLoggedIn()) {
+    redirect('../index.php?page=login');
+}
+$user = currentUser();
+?>
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<?= e(csrfToken()) ?>">
+    <title>ConnectSphere – Messagerie</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        .chat-container {
+            display: flex;
+            gap: 1rem;
+        }
+        .contacts {
+            width: 25%;
+            min-width: 200px;
+            border-right: 1px solid #ddd;
+        }
+        .chat-box {
+            flex-grow: 1;
+            height: 500px;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: #f8f9fa;
+            border-radius: 10px;
+        }
+        .message.you {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="../index.php?page=feed" class="btn btn-link px-0">← Retour au fil</a>
+        <h3 class="mb-0">📩 Messagerie ConnectSphere</h3>
+        <span class="text-muted"><?= e($user['username']) ?></span>
+    </div>
+
+    <div class="chat-container">
+        <div class="contacts">
+            <h5>🧑‍🤝‍🧑 Contacts</h5>
+            <div id="contacts"></div>
+
+            <!-- ✅ Formulaire pour démarrer une nouvelle conversation -->
+            <form id="startConversationForm" class="mt-3">
+                <div class="input-group">
+                    <input type="text" id="new_contact" name="new_contact" class="form-control" placeholder="Nom d'utilisateur..." required>
+                    <button type="submit" class="btn btn-secondary">Démarrer</button>
+                </div>
+                <div id="startConvMsg" class="mt-1 text-danger small"></div>
+            </form>
+        </div>
+
+        <div class="flex-grow-1">
+            <div id="chat-box" class="chat-box mb-3">Sélectionnez un contact pour discuter.</div>
+            <form id="sendMessageForm" class="d-none">
+                <input type="hidden" name="receiver_id" id="receiver_id">
+                <div class="input-group">
+                    <input type="text" name="content" class="form-control" placeholder="Message..." required>
+                    <button type="submit" class="btn btn-primary">Envoyer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentReceiver = null;
+
+// Jeton CSRF envoyé avec chaque requête POST
+$.ajaxSetup({ headers: { 'X-CSRF-Token': $('meta[name="csrf-token"]').attr('content') } });
+
+function loadContacts() {
+    $.get("fetch_contact.php", function(data) {
+        $("#contacts").html(data);
+    });
+}
+
+function loadMessages() {
+    if (!currentReceiver) return;
+    $.get("fetch_message.php", { receiver_id: currentReceiver }, function(data) {
+        $("#chat-box").html(data);
+        $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
+    });
+}
+
+$(document).on("click", ".contact-item", function() {
+    $(".contact-item").removeClass("bg-light");
+    $(this).addClass("bg-light");
+    currentReceiver = $(this).data("id");
+    $("#receiver_id").val(currentReceiver);
+    $("#sendMessageForm").removeClass("d-none");
+    loadMessages();
+});
+
+// ✅ Envoi de message
+$("#sendMessageForm").on("submit", function(e) {
+    e.preventDefault();
+    $.post("send_message.php", $(this).serialize())
+        .done(function() {
+            $("input[name='content']").val('');
+            loadMessages();
+            loadContacts();
+        })
+        .fail(function(xhr) {
+            alert(xhr.responseText || "Message non envoyé.");
+        });
+});
+
+// ✅ Démarrer une conversation
+$("#startConversationForm").on("submit", function(e) {
+    e.preventDefault();
+    $.post("start_conversation.php", $(this).serialize(), function(response) {
+        $("#startConvMsg").text(response);
+        loadContacts();
+        $("#startConversationForm")[0].reset();
+        setTimeout(() => $("#startConvMsg").text(''), 4000);
+    });
+});
+
+// Rafraîchissements automatiques
+setInterval(loadMessages, 1500);
+setInterval(loadContacts, 10000);
+loadContacts();
+</script>
+</body>
+</html>

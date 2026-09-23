@@ -1,0 +1,10 @@
+<?php
+require_once __DIR__ . '/../../config/database.php';
+require_once __DIR__ . '/../../controllers/MessageController.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    exit;
+}
+
+(new MessageController($pdo))->send($_POST['receiver_id'] ?? 0, $_POST['content'] ?? '');
