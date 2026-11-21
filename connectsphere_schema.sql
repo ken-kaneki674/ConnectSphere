@@ -91,6 +91,11 @@ CREATE TABLE group_memberships (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Vue de compatibilité group_members
+CREATE OR REPLACE VIEW group_members AS 
+SELECT id, group_id, user_id, 'member' AS role, joined_at 
+FROM group_memberships;
+
 -- 💬 conversations
 CREATE TABLE conversations (
     id INT PRIMARY KEY AUTO_INCREMENT,

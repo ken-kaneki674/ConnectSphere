@@ -1,0 +1,32 @@
+{
+  "name": "connectsphere",
+  "version": "2.0.0",
+  "private": true,
+  "description": "ConnectSphere - Plateforme Sociale Web & Mobile React Native",
+  "scripts": {
+    "mobile": "npm --prefix mobile run start",
+    "mobile:clean": "npm --prefix mobile run start -- -c",
+    "mobile:android": "npm --prefix mobile run android",
+    "mobile:ios": "npm --prefix mobile run ios",
+    "mobile:web": "npm --prefix mobile run web",
+    "backend": "npm --prefix backend start",
+    "backend:dev": "npm --prefix backend run dev",
+    "serve": "vue-cli-service serve",
+    "build": "vue-cli-service build",
+    "lint": "vue-cli-service lint"
+  },
+  "dependencies": {
+    "vue": "^3.3.0",
+    "vue-router": "^4.2.0",
+    "vuex": "^4.1.0",
+    "axios": "^1.4.0",
+    "bootstrap": "^5.3.0",
+    "bootstrap-icons": "^1.10.0"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-router": "^5.0.0",
+    "@vue/cli-plugin-vuex": "^5.0.0",
+    "@vue/cli-service": "^5.0.0",
+    "@vue/compiler-sfc": "^3.3.0"
+  }
+}
