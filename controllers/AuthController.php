@@ -1,53 +1,68 @@
 <?php
-session_start();
-
-if (isset($_GET['action']) && $_GET['action'] === 'logout') {
-    session_destroy(); // Supprime toutes les données de session
-    header("Location: ../public/index.php?page=login"); // Redirige vers la page de login
-    exit;
-}
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../models/User.php';
-session_start();
 
-$userModel = new User($pdo);
+class AuthController {
+    private $userModel;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['register'])) {
-        $username = htmlspecialchars(trim($_POST['username']));
-        $email = htmlspecialchars(trim($_POST['email']));
-        $password = $_POST['password'];
-
-        if ($userModel->create($username, $email, $password)) {
-            $_SESSION['success'] = "Inscription réussie. Connectez-vous.";
-            header("Location: ../views/auth/login.php");
-            exit;
-        } else {
-            $_SESSION['error'] = "Erreur lors de l'inscription.";
-            header("Location: ../views/auth/register.php");
-            exit;
-        }
+    public function __construct($pdo) {
+        $this->userModel = new User($pdo);
     }
 
-    if (isset($_POST['login'])) {
-        $email = htmlspecialchars(trim($_POST['email']));
-        $password = $_POST['password'];
-        $user = $userModel->findByEmail($email);
-
-        if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user'] = $user;
-            header("Location: ../public/index.php");
-            exit;
-        } else {
-            $_SESSION['error'] = "Identifiants incorrects.";
-            header("Location: ../views/auth/login.php");
-            exit;
+    // Retourne un message d'erreur, ou redirige en cas de succès
+    public function login() {
+        if (!checkCsrf()) {
+            return "Session expirée, veuillez réessayer.";
         }
-    }
-}
 
-if (isset($_GET['logout'])) {
-    session_destroy();
-    header("Location: ../views/auth/login.php");
-    exit;
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        if ($email === '' || $password === '') {
+            return "Veuillez remplir tous les champs.";
+        }
+
+        $user = $this->userModel->findByEmail($email);
+        if (!$user || !password_verify($password, $user['password'])) {
+            return "Email ou mot de passe incorrect.";
+        }
+
+        session_regenerate_id(true);
+        unset($user['password']);
+        $_SESSION['user'] = $user;
+        redirect('index.php?page=feed');
+    }
+
+    public function register() {
+        if (!checkCsrf()) {
+            return "Session expirée, veuillez réessayer.";
+        }
+
+        $username = trim($_POST['username'] ?? '');
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        if ($username === '' || $email === '' || $password === '') {
+            return "Veuillez remplir tous les champs.";
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return "Adresse email invalide.";
+        }
+        if (strlen($password) < 6) {
+            return "Le mot de passe doit contenir au moins 6 caractères.";
+        }
+        if ($this->userModel->exists($username, $email)) {
+            return "Ce nom d'utilisateur ou cet email est déjà utilisé.";
+        }
+
+        $this->userModel->create($username, $email, $password);
+        flash('success', "Inscription réussie. Connectez-vous.");
+        redirect('index.php?page=login');
+    }
+
+    public function logout() {
+        $_SESSION = [];
+        session_destroy();
+        redirect('index.php?page=login');
+    }
 }

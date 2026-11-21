@@ -1,18 +1,18 @@
 <?php
-require_once __DIR__ . '/../../includes/db.php';
-session_start();
+require_once __DIR__ . '/../../includes/functions.php';
 
-if (!isset($_SESSION['user'])) {
-    header("Location: ../../public/index.php?page=login");
-    exit();
+if (!isLoggedIn()) {
+    redirect('../index.php?page=login');
 }
-$user = $_SESSION['user'];
+$user = currentUser();
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="<?= e(csrfToken()) ?>">
     <title>ConnectSphere – Messagerie</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -23,6 +23,7 @@ $user = $_SESSION['user'];
         }
         .contacts {
             width: 25%;
+            min-width: 200px;
             border-right: 1px solid #ddd;
         }
         .chat-box {
@@ -40,7 +41,11 @@ $user = $_SESSION['user'];
 </head>
 <body>
 <div class="container mt-5">
-    <h3 class="mb-4 text-center">📩 Messagerie ConnectSphere</h3>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <a href="../index.php?page=feed" class="btn btn-link px-0">← Retour au fil</a>
+        <h3 class="mb-0">📩 Messagerie ConnectSphere</h3>
+        <span class="text-muted"><?= e($user['username']) ?></span>
+    </div>
 
     <div class="chat-container">
         <div class="contacts">
@@ -73,21 +78,26 @@ $user = $_SESSION['user'];
 <script>
 let currentReceiver = null;
 
+// Jeton CSRF envoyé avec chaque requête POST
+$.ajaxSetup({ headers: { 'X-CSRF-Token': $('meta[name="csrf-token"]').attr('content') } });
+
 function loadContacts() {
-    $.get("fetch_contacts.php", function(data) {
+    $.get("fetch_contact.php", function(data) {
         $("#contacts").html(data);
     });
 }
 
 function loadMessages() {
     if (!currentReceiver) return;
-    $.get("fetch_messages.php?receiver_id=" + currentReceiver, function(data) {
+    $.get("fetch_message.php", { receiver_id: currentReceiver }, function(data) {
         $("#chat-box").html(data);
         $('#chat-box').scrollTop($('#chat-box')[0].scrollHeight);
     });
 }
 
 $(document).on("click", ".contact-item", function() {
+    $(".contact-item").removeClass("bg-light");
+    $(this).addClass("bg-light");
     currentReceiver = $(this).data("id");
     $("#receiver_id").val(currentReceiver);
     $("#sendMessageForm").removeClass("d-none");
@@ -97,10 +107,15 @@ $(document).on("click", ".contact-item", function() {
 // ✅ Envoi de message
 $("#sendMessageForm").on("submit", function(e) {
     e.preventDefault();
-    $.post("send_message.php", $(this).serialize(), function() {
-        $("input[name='content']").val('');
-        loadMessages();
-    });
+    $.post("send_message.php", $(this).serialize())
+        .done(function() {
+            $("input[name='content']").val('');
+            loadMessages();
+            loadContacts();
+        })
+        .fail(function(xhr) {
+            alert(xhr.responseText || "Message non envoyé.");
+        });
 });
 
 // ✅ Démarrer une conversation

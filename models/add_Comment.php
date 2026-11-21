@@ -1,5 +1,5 @@
 <?php
-// models/Comment.php
+// models/add_Comment.php
 class Comment {
     private $pdo;
 
@@ -10,19 +10,18 @@ class Comment {
     public function addComment($post_id, $user_id, $content) {
         $stmt = $this->pdo->prepare("INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)");
         $stmt->execute([$post_id, $user_id, $content]);
-        return $this->pdo->lastInsertId();
+        return (int)$this->pdo->lastInsertId();
     }
 
     public function getComments($post_id) {
         $stmt = $this->pdo->prepare("
-            SELECT pc.*, u.username, u.profile_picture 
+            SELECT pc.*, u.username, u.profile_picture
             FROM post_comments pc
             JOIN users u ON pc.user_id = u.id
             WHERE pc.post_id = ?
-            ORDER BY pc.created_at DESC
+            ORDER BY pc.created_at ASC, pc.id ASC
         ");
         $stmt->execute([$post_id]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
-?>
