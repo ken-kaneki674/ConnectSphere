@@ -1,8 +1,7 @@
-
 -- ==========================
 -- 📘 DATABASE: ConnectSphere
 -- ==========================
--- Schéma commun aux trois versions (PHP MVC, API PHP, backend Node.js).
+-- Schéma commun (PHP MVC, API PHP, backend Node.js & mobile React Native).
 -- Import : mysql -u root -p < connectsphere_schema.sql
 
 CREATE DATABASE IF NOT EXISTS connectsphere
@@ -33,14 +32,52 @@ CREATE TABLE IF NOT EXISTS friend_requests (
     FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 📝 posts
+-- 📦 groups (« groups » est un mot réservé depuis MySQL 8 : toujours l'écrire `groups`)
+CREATE TABLE IF NOT EXISTS `groups` (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    creator_id INT NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    image VARCHAR(255),
+    privacy ENUM('public', 'private') NOT NULL DEFAULT 'public',
+    group_type ENUM('chat', 'feed') NOT NULL DEFAULT 'feed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 👥 group_members
+CREATE TABLE IF NOT EXISTS group_members (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    group_id INT NOT NULL,
+    user_id INT NOT NULL,
+    role ENUM('member', 'admin') NOT NULL DEFAULT 'member',
+    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_group_member (group_id, user_id),
+    FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 📝 posts (group_id optionnel pour les publications dans un groupe)
 CREATE TABLE IF NOT EXISTS posts (
     id INT PRIMARY KEY AUTO_INCREMENT,
     user_id INT NOT NULL,
+    group_id INT NULL,
     content TEXT NOT NULL,
     image_path VARCHAR(255),
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE
+);
+
+-- 💬 group_messages (messages pour les groupes de type 'chat')
+CREATE TABLE IF NOT EXISTS group_messages (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    group_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    content TEXT NOT NULL,
+    sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- ❤️ post_likes (un seul like par utilisateur et par post)
@@ -75,35 +112,6 @@ CREATE TABLE IF NOT EXISTS reports (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE
 );
-
--- 📦 groups (« groups » est un mot réservé depuis MySQL 8 : toujours l'écrire `groups`)
-CREATE TABLE IF NOT EXISTS `groups` (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    creator_id INT NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    privacy ENUM('public', 'private') NOT NULL DEFAULT 'public',
-    group_type ENUM('chat', 'feed') NOT NULL DEFAULT 'feed',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- 👥 group_members
-CREATE TABLE IF NOT EXISTS group_members (
-    id INT PRIMARY KEY AUTO_INCREMENT,
-    group_id INT NOT NULL,
-    user_id INT NOT NULL,
-    role ENUM('member', 'admin') NOT NULL DEFAULT 'member',
-    joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_group_member (group_id, user_id),
-    FOREIGN KEY (group_id) REFERENCES `groups`(id) ON DELETE CASCADE,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-);
-
--- Vue de compatibilité group_members
-CREATE OR REPLACE VIEW group_members AS 
-SELECT id, group_id, user_id, 'member' AS role, joined_at 
-FROM group_memberships;
 
 -- 💬 conversations
 CREATE TABLE IF NOT EXISTS conversations (

@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,12 +35,12 @@ export const PostDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        if (!post && postId) {
-          const fetchedPost = await api.getPost(postId);
-          if (fetchedPost) setPost(fetchedPost);
-        }
         if (postId) {
-          const data = await api.getComments(postId);
+          const [fetchedPost, data] = await Promise.all([
+            api.getPost(postId),
+            api.getComments(postId),
+          ]);
+          if (fetchedPost) setPost(fetchedPost);
           setComments(data || []);
         }
       } catch (e) {
@@ -51,6 +52,16 @@ export const PostDetailScreen = ({ route, navigation }) => {
     fetchData();
   }, [postId]);
 
+  const handleToggleLike = async () => {
+    if (!post?.id) return;
+    const res = await api.toggleLike(post.id);
+    if (res) {
+      setPost((prev) =>
+        prev ? { ...prev, is_liked: res.liked, likes_count: res.likes_count } : prev
+      );
+    }
+  };
+
   const handleSendComment = async () => {
     if (!commentText.trim() || !postId) return;
 
@@ -59,7 +70,7 @@ export const PostDetailScreen = ({ route, navigation }) => {
     setSending(true);
 
     try {
-      const added = await api.addComment(postId, content, user?.username || 'Vous');
+      const added = await api.addComment(postId, content, user?.username || 'Vous', user);
       if (added) {
         setComments((prev) => [...prev, added]);
         setPost((prev) => (prev ? { ...prev, comments_count: (prev.comments_count || 0) + 1 } : prev));
@@ -69,6 +80,30 @@ export const PostDetailScreen = ({ route, navigation }) => {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleCommentLongPress = (comment) => {
+    const isMine = user?.id && (comment.user?.id === user.id || comment.user_id === user.id);
+    if (!isMine) return;
+
+    Alert.alert('Supprimer le commentaire', 'Voulez-vous supprimer ce commentaire ?', [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await api.deleteComment(comment.id, postId);
+            setComments((prev) => prev.filter((c) => c.id !== comment.id));
+            setPost((prev) =>
+              prev ? { ...prev, comments_count: Math.max(0, (prev.comments_count || 1) - 1) } : prev
+            );
+          } catch (e) {
+            Alert.alert('Erreur', e?.message || 'Suppression impossible');
+          }
+        },
+      },
+    ]);
   };
 
   return (
@@ -86,7 +121,9 @@ export const PostDetailScreen = ({ route, navigation }) => {
             {post && (
               <PostCard
                 post={post}
-                onLike={() => api.toggleLike(post.id)}
+                onLike={handleToggleLike}
+                onUserPress={(u) => navigation.navigate('UserProfile', { userId: u.id, user: u })}
+                onDeleted={() => navigation.goBack()}
               />
             )}
             <View style={styles.commentsHeader}>
@@ -96,7 +133,11 @@ export const PostDetailScreen = ({ route, navigation }) => {
             </View>
           </View>
         }
-        renderItem={({ item }) => <CommentItem comment={item} />}
+        renderItem={({ item }) => (
+          <TouchableOpacity activeOpacity={0.85} onLongPress={() => handleCommentLongPress(item)}>
+            <CommentItem comment={item} />
+          </TouchableOpacity>
+        )}
         ListEmptyComponent={
           loadingComments ? (
             <ActivityIndicator style={{ marginTop: 20 }} color={theme.colors.primary} />
@@ -164,22 +205,10 @@ export const PostDetailScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  commentsHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  commentsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  emptyBox: {
-    padding: 24,
-    alignItems: 'center',
-  },
+  container: { flex: 1 },
+  commentsHeader: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6 },
+  commentsTitle: { fontSize: 16, fontWeight: '700' },
+  emptyBox: { padding: 24, alignItems: 'center' },
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',

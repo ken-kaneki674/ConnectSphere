@@ -1,58 +1,28 @@
 const express = require('express');
 const pool = require('../config/database');
-const jwt = require('jsonwebtoken');
+const { authenticateToken, optionalAuth } = require('../middleware/auth');
+const q = require('../utils/queries');
+const store = require('../utils/devStore');
 
 const router = express.Router();
 
-// Middleware pour vérifier le token JWT
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-    req.user = user;
-    next();
-  });
-};
-
-// Get all posts
-router.get('/', async (req, res) => {
+// Get all public feed posts (with optional pagination)
+router.get('/', optionalAuth, async (req, res) => {
   try {
-    // Pour le développement, retourner des données simulées
-    if (process.env.NODE_ENV === 'development') {
-      return res.json([
-        {
-          id: 1,
-          content: 'Bienvenue sur ConnectSphere !',
-          user: { username: 'Admin', profile_picture: null },
-          created_at: new Date().toISOString(),
-          likes_count: 5
-        },
-        {
-          id: 2,
-          content: 'Ceci est un post de test.',
-          user: { username: 'User1', profile_picture: null },
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          likes_count: 3
-        }
-      ]);
+    const viewerId = req.user?.id || 0;
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : null;
+    const offset = req.query.offset ? parseInt(req.query.offset, 10) : 0;
+
+    if (store.isDevFallback()) {
+      const feedPosts = store.posts
+        .filter((p) => !p.group_id)
+        .sort((a, b) => new Date(b.created_at) - new Date(a.created_at) || b.id - a.id)
+        .map((p) => store.formatPost(p, viewerId));
+      const slice = limit && limit > 0 ? feedPosts.slice(offset, offset + limit) : feedPosts;
+      return res.json(slice);
     }
 
-    const [posts] = await pool.execute(`
-      SELECT p.*, u.username, u.profile_picture,
-             (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      ORDER BY p.created_at DESC
-    `);
-
+    const posts = await q.getPosts(viewerId, 'WHERE p.group_id IS NULL', [], limit, offset);
     res.json(posts);
   } catch (error) {
     console.error('Get posts error:', error);
@@ -60,41 +30,37 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create post
+// Create post (optionally scoped to a group_id)
 router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { content, image_path } = req.body;
+    const { content, image_path, group_id } = req.body;
     const userId = req.user.id;
+    const cleanContent = (content || '').trim();
 
-    if (!content) {
-      return res.status(400).json({ error: 'Content required' });
+    if (!cleanContent) {
+      return res.status(400).json({ error: 'Le contenu est requis' });
     }
 
-    // Pour le développement, retourner des données simulées
-    if (process.env.NODE_ENV === 'development') {
-      return res.json({
-        id: Math.floor(Math.random() * 1000),
-        content,
-        user: { username: req.user.username, profile_picture: null },
+    if (store.isDevFallback()) {
+      const newPost = {
+        id: store.genId(),
+        user_id: userId,
+        group_id: group_id ? Number(group_id) : null,
+        content: cleanContent,
+        image_path: image_path || null,
         created_at: new Date().toISOString(),
-        likes_count: 0
-      });
+      };
+      store.posts.unshift(newPost);
+      return res.status(201).json(store.formatPost(newPost, userId));
     }
 
     const [result] = await pool.execute(
-      'INSERT INTO posts (user_id, content, image_path) VALUES (?, ?, ?)',
-      [userId, content, image_path || null]
+      'INSERT INTO posts (user_id, group_id, content, image_path) VALUES (?, ?, ?, ?)',
+      [userId, group_id ? Number(group_id) : null, cleanContent, image_path || null]
     );
 
-    const [newPost] = await pool.execute(`
-      SELECT p.*, u.username, u.profile_picture,
-             (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.id = ?
-    `, [result.insertId]);
-
-    res.status(201).json(newPost[0]);
+    const newPost = await q.getPost(userId, result.insertId);
+    res.status(201).json(newPost);
   } catch (error) {
     console.error('Create post error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -102,23 +68,23 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // Get single post
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalAuth, async (req, res) => {
   try {
-    const postId = req.params.id;
+    const postId = Number(req.params.id);
+    const viewerId = req.user?.id || 0;
 
-    const [posts] = await pool.execute(`
-      SELECT p.*, u.username, u.profile_picture,
-             (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as likes_count
-      FROM posts p
-      JOIN users u ON p.user_id = u.id
-      WHERE p.id = ?
-    `, [postId]);
+    if (store.isDevFallback()) {
+      const found = store.posts.find((p) => p.id === postId);
+      if (!found) return res.status(404).json({ error: 'Post not found' });
+      return res.json(store.formatPost(found, viewerId));
+    }
 
-    if (posts.length === 0) {
+    const post = await q.getPost(viewerId, postId);
+    if (!post) {
       return res.status(404).json({ error: 'Post not found' });
     }
 
-    res.json(posts[0]);
+    res.json(post);
   } catch (error) {
     console.error('Get post error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -128,8 +94,17 @@ router.get('/:id', async (req, res) => {
 // Delete post
 router.delete('/:id', authenticateToken, async (req, res) => {
   try {
-    const postId = req.params.id;
+    const postId = Number(req.params.id);
     const userId = req.user.id;
+
+    if (store.isDevFallback()) {
+      const idx = store.posts.findIndex((p) => p.id === postId && p.user_id === userId);
+      if (idx === -1) {
+        return res.status(404).json({ error: 'Post not found or unauthorized' });
+      }
+      store.posts.splice(idx, 1);
+      return res.json({ message: 'Post deleted successfully', id: postId });
+    }
 
     const [result] = await pool.execute(
       'DELETE FROM posts WHERE id = ? AND user_id = ?',
@@ -140,7 +115,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Post not found or unauthorized' });
     }
 
-    res.json({ message: 'Post deleted successfully' });
+    res.json({ message: 'Post deleted successfully', id: postId });
   } catch (error) {
     console.error('Delete post error:', error);
     res.status(500).json({ error: 'Server error' });

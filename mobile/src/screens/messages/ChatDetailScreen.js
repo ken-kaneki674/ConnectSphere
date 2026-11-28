@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,8 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,28 +18,44 @@ import { useAuth } from '../../context/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { api } from '../../services/api';
 
+const formatMessageTime = (value) => {
+  if (!value) return '';
+  if (/^\d{2}:\d{2}$/.test(String(value))) return value;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 export const ChatDetailScreen = ({ route, navigation }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { conversation: initialConversation = {}, onMessageSent } = route?.params || {};
 
-  const [conversation, setConversation] = useState(initialConversation);
+  const [conversation] = useState(initialConversation);
   const [messages, setMessages] = useState(initialConversation?.messages || []);
   const [inputMessage, setInputMessage] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef(null);
+  const isOfflineRef = useRef(false);
+
+  const loadMessages = useCallback(async () => {
+    if (!conversation?.id) return;
+    const liveMessages = await api.getMessages(conversation.id);
+    if (Array.isArray(liveMessages) && liveMessages.length > 0) {
+      setMessages(liveMessages);
+    }
+  }, [conversation?.id]);
 
   useEffect(() => {
-    const fetchChatMessages = async () => {
-      if (conversation?.id) {
-        const liveMessages = await api.getMessages(conversation.id);
-        if (Array.isArray(liveMessages) && liveMessages.length > 0) {
-          setMessages(liveMessages);
-        }
+    loadMessages();
+    const interval = setInterval(() => {
+      if (!isOfflineRef.current) {
+        loadMessages();
       }
-    };
-    fetchChatMessages();
-  }, [conversation?.id]);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [loadMessages]);
 
   const handleSend = async () => {
     if (!inputMessage.trim()) return;
@@ -45,31 +63,48 @@ export const ChatDetailScreen = ({ route, navigation }) => {
     const text = inputMessage.trim();
     setInputMessage('');
 
-    const newMsg = {
+    const optimisticMsg = {
       id: Date.now(),
       sender_id: user?.id || 1,
       content: text,
-      sent_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      sent_at: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, newMsg]);
+    setMessages((prev) => [...prev, optimisticMsg]);
 
     try {
-      await api.sendMessage(conversation?.id || 1, text, user?.id || 1);
+      const saved = await api.sendMessage(conversation?.id || 1, text, user?.id || 1);
       if (onMessageSent) onMessageSent();
 
-      // Simulated auto-reply in demo mode
-      setTimeout(() => {
-        const reply = {
-          id: Date.now() + 1,
-          sender_id: conversation?.user?.id || 2,
-          content: 'Bien reçu ! ConnectSphere mobile est vraiment top 👌',
-          sent_at: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        };
-        setMessages((prev) => [...prev, reply]);
-      }, 1200);
+      if (!saved?._fromServer) {
+        isOfflineRef.current = true;
+        setTimeout(() => {
+          const reply = {
+            id: Date.now() + 1,
+            sender_id: conversation?.user?.id || 2,
+            content: 'Bien reçu ! ConnectSphere mobile est vraiment fluide 👌',
+            sent_at: new Date().toISOString(),
+          };
+          setMessages((prev) => [...prev, reply]);
+        }, 1200);
+      }
     } catch (e) {
       console.log('Error sending message', e);
+    }
+  };
+
+  const openPartnerProfile = () => {
+    setMenuVisible(false);
+    if (conversation?.user?.id) {
+      navigation.navigate('UserProfile', { userId: conversation.user.id, user: conversation.user });
+    }
+  };
+
+  const reportPartner = async () => {
+    setMenuVisible(false);
+    if (conversation?.user?.id) {
+      await api.reportContent('user', conversation.user.id, 'Comportement inapproprié en messagerie');
+      Alert.alert('Signalement envoyé', 'Merci, ce signalement a été transmis.');
     }
   };
 
@@ -95,24 +130,25 @@ export const ChatDetailScreen = ({ route, navigation }) => {
             <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
 
-          <Avatar
-            uri={conversation?.user?.profile_picture}
-            name={conversation?.user?.username}
-            size={38}
-            showOnline={true}
-            isOnline={conversation?.user?.is_online}
-          />
+          <TouchableOpacity onPress={openPartnerProfile} style={styles.partnerTouch}>
+            <Avatar
+              uri={conversation?.user?.profile_picture}
+              name={conversation?.user?.username}
+              size={38}
+              showOnline={true}
+              isOnline={conversation?.user?.is_online}
+            />
+            <View style={styles.headerInfo}>
+              <Text style={[styles.headerName, { color: theme.colors.text }]}>
+                {conversation?.user?.username || 'Utilisateur'}
+              </Text>
+              <Text style={[styles.headerStatus, { color: theme.colors.textMuted }]}>
+                {conversation?.user?.is_online ? 'En ligne' : 'Vu récemment'}
+              </Text>
+            </View>
+          </TouchableOpacity>
 
-          <View style={styles.headerInfo}>
-            <Text style={[styles.headerName, { color: theme.colors.text }]}>
-              {conversation?.user?.username || 'Utilisateur'}
-            </Text>
-            <Text style={[styles.headerStatus, { color: theme.colors.textMuted }]}>
-              {conversation?.user?.is_online ? 'En ligne' : 'Vu récemment'}
-            </Text>
-          </View>
-
-          <TouchableOpacity style={styles.headerIcon}>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} style={styles.headerIcon}>
             <Ionicons name="ellipsis-vertical" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -126,7 +162,7 @@ export const ChatDetailScreen = ({ route, navigation }) => {
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
         renderItem={({ item }) => {
-          const isMine = item.sender_id === (user?.id || 1);
+          const isMine = item.is_sender ?? item.sender_id === (user?.id || 1);
           return (
             <View
               style={[
@@ -142,12 +178,7 @@ export const ChatDetailScreen = ({ route, navigation }) => {
                     : { backgroundColor: theme.colors.surface, borderColor: theme.colors.border, borderWidth: 1 },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.messageText,
-                    { color: isMine ? '#FFF' : theme.colors.text },
-                  ]}
-                >
+                <Text style={[styles.messageText, { color: isMine ? '#FFF' : theme.colors.text }]}>
                   {item.content}
                 </Text>
                 <Text
@@ -156,7 +187,7 @@ export const ChatDetailScreen = ({ route, navigation }) => {
                     { color: isMine ? 'rgba(255,255,255,0.7)' : theme.colors.textMuted },
                   ]}
                 >
-                  {item.sent_at}
+                  {formatMessageTime(item.sent_at || item.created_at)}
                 </Text>
               </View>
             </View>
@@ -205,92 +236,48 @@ export const ChatDetailScreen = ({ route, navigation }) => {
           />
         </TouchableOpacity>
       </View>
+
+      {/* Options Modal */}
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setMenuVisible(false)}>
+          <View style={[styles.modalCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <TouchableOpacity onPress={openPartnerProfile} style={[styles.menuRow, { borderBottomColor: theme.colors.border }]}>
+              <Ionicons name="person-outline" size={20} color={theme.colors.text} />
+              <Text style={[styles.menuText, { color: theme.colors.text }]}>Voir le profil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={reportPartner} style={[styles.menuRow, { borderBottomWidth: 0 }]}>
+              <Ionicons name="flag-outline" size={20} color={theme.colors.warning} />
+              <Text style={[styles.menuText, { color: theme.colors.warning }]}>Signaler cet utilisateur</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    borderBottomWidth: 1,
-    justifyContent: 'flex-end',
-  },
-  headerRow: {
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-  },
-  backBtn: {
-    padding: 6,
-    marginRight: 6,
-  },
-  headerInfo: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  headerName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  headerStatus: {
-    fontSize: 11,
-  },
-  headerIcon: {
-    padding: 6,
-  },
-  messagesContainer: {
-    padding: 16,
-    paddingBottom: 20,
-  },
-  messageRow: {
-    marginVertical: 4,
-    flexDirection: 'row',
-  },
-  myMessageRow: {
-    justifyContent: 'flex-end',
-  },
-  otherMessageRow: {
-    justifyContent: 'flex-start',
-  },
-  messageBubble: {
-    maxWidth: '75%',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 16,
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 20,
-  },
-  messageTime: {
-    fontSize: 10,
-    alignSelf: 'flex-end',
-    marginTop: 4,
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-  },
-  textInput: {
-    flex: 1,
-    height: 44,
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    fontSize: 15,
-  },
-  sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
+  container: { flex: 1 },
+  header: { borderBottomWidth: 1, justifyContent: 'flex-end' },
+  headerRow: { height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12 },
+  backBtn: { padding: 6, marginRight: 6 },
+  partnerTouch: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  headerInfo: { flex: 1, marginLeft: 10 },
+  headerName: { fontSize: 16, fontWeight: '700' },
+  headerStatus: { fontSize: 11 },
+  headerIcon: { padding: 6 },
+  messagesContainer: { padding: 16, paddingBottom: 20 },
+  messageRow: { marginVertical: 4, flexDirection: 'row' },
+  myMessageRow: { justifyContent: 'flex-end' },
+  otherMessageRow: { justifyContent: 'flex-start' },
+  messageBubble: { maxWidth: '75%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  messageText: { fontSize: 15, lineHeight: 20 },
+  messageTime: { fontSize: 10, alignSelf: 'flex-end', marginTop: 4 },
+  inputBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 10, borderTopWidth: 1 },
+  textInput: { flex: 1, height: 44, borderRadius: 22, paddingHorizontal: 16, borderWidth: 1, fontSize: 15 },
+  sendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 },
+  modalCard: { borderRadius: 18, padding: 16, borderWidth: 1 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1 },
+  menuText: { fontSize: 15, fontWeight: '600', marginLeft: 12 },
 });

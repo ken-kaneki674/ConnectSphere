@@ -26,11 +26,11 @@ const PRESET_IMAGES = [
 export const CreatePostScreen = ({ route, navigation }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
-  const onPostCreated = route?.params?.onPostCreated;
+  const { onPostCreated, groupId, groupName, selectMedia } = route?.params || {};
 
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [showImageInput, setShowImageInput] = useState(route?.params?.selectMedia || false);
+  const [showImageInput, setShowImageInput] = useState(selectMedia || false);
   const [loading, setLoading] = useState(false);
 
   const handlePublish = async () => {
@@ -38,7 +38,11 @@ export const CreatePostScreen = ({ route, navigation }) => {
 
     setLoading(true);
     try {
-      await api.createPost(content.trim(), imageUrl.trim() || null, user);
+      if (groupId) {
+        await api.createGroupPost(groupId, content.trim(), imageUrl.trim() || null, user);
+      } else {
+        await api.createPost(content.trim(), imageUrl.trim() || null, user);
+      }
       if (onPostCreated) {
         onPostCreated();
       }
@@ -53,7 +57,7 @@ export const CreatePostScreen = ({ route, navigation }) => {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <Header
-        title="Créer une publication"
+        title={groupName ? `Publier • ${groupName}` : 'Créer une publication'}
         showBack={true}
         onBack={() => navigation.goBack()}
         rightAction={{
@@ -72,8 +76,10 @@ export const CreatePostScreen = ({ route, navigation }) => {
               {user?.username || 'Vous'}
             </Text>
             <View style={[styles.badge, { backgroundColor: 'rgba(79, 70, 229, 0.15)' }]}>
-              <Ionicons name="globe-outline" size={12} color={theme.colors.primaryLight} />
-              <Text style={[styles.badgeText, { color: theme.colors.primaryLight }]}>Public</Text>
+              <Ionicons name={groupName ? 'people-outline' : 'globe-outline'} size={12} color={theme.colors.primaryLight} />
+              <Text style={[styles.badgeText, { color: theme.colors.primaryLight }]}>
+                {groupName || 'Public'}
+              </Text>
             </View>
           </View>
         </View>

@@ -50,6 +50,7 @@ export const SearchScreen = ({ navigation }) => {
 
   const handleTagClick = (tag) => {
     const clean = tag.replace('#', '');
+    setActiveTab('posts');
     handleSearch(clean);
   };
 
@@ -82,7 +83,6 @@ export const SearchScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* When no query is typed, show trending topics */}
       {!query ? (
         <View style={styles.trendingSection}>
           <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
@@ -110,7 +110,6 @@ export const SearchScreen = ({ navigation }) => {
         </View>
       ) : (
         <>
-          {/* Tabs: Utilisateurs / Posts */}
           <View style={[styles.tabsRow, { borderBottomColor: theme.colors.border }]}>
             <TouchableOpacity
               onPress={() => setActiveTab('users')}
@@ -154,7 +153,9 @@ export const SearchScreen = ({ navigation }) => {
               data={results.users}
               keyExtractor={(item) => String(item.id)}
               renderItem={({ item }) => (
-                <View
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => navigation.navigate('UserProfile', { userId: item.id, user: item })}
                   style={[
                     styles.userCard,
                     { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
@@ -165,16 +166,17 @@ export const SearchScreen = ({ navigation }) => {
                     <Text style={[styles.userName, { color: theme.colors.text }]}>
                       {item.username}
                     </Text>
-                    <Text style={[styles.userBio, { color: theme.colors.textSecondary }]}>
+                    <Text style={[styles.userBio, { color: theme.colors.textSecondary }]} numberOfLines={1}>
                       {item.bio || 'Membre de ConnectSphere'}
                     </Text>
                   </View>
                   <TouchableOpacity
+                    onPress={() => navigation.navigate('UserProfile', { userId: item.id, user: item })}
                     style={[styles.followBtn, { backgroundColor: theme.colors.primary }]}
                   >
                     <Text style={styles.followText}>Voir</Text>
                   </TouchableOpacity>
-                </View>
+                </TouchableOpacity>
               )}
               ListEmptyComponent={
                 <View style={styles.noResults}>
@@ -189,7 +191,16 @@ export const SearchScreen = ({ navigation }) => {
               renderItem={({ item }) => (
                 <PostCard
                   post={item}
+                  onLike={() => api.toggleLike(item.id)}
+                  onUserPress={(u) => navigation.navigate('UserProfile', { userId: u.id, user: u })}
                   onPress={() => navigation.navigate('PostDetail', { postId: item.id, post: item })}
+                  onCommentPress={() => navigation.navigate('PostDetail', { postId: item.id, post: item })}
+                  onDeleted={(id) =>
+                    setResults((prev) => ({
+                      ...prev,
+                      posts: prev.posts.filter((p) => p.id !== id),
+                    }))
+                  }
                 />
               )}
               ListEmptyComponent={
@@ -206,13 +217,8 @@ export const SearchScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  searchBarWrapper: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
+  container: { flex: 1 },
+  searchBarWrapper: { paddingHorizontal: 16, paddingVertical: 12 },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -221,22 +227,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderWidth: 1,
   },
-  searchInput: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-  },
-  trendingSection: {
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 14,
-  },
-  tagsContainer: {
-    gap: 10,
-  },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 15 },
+  trendingSection: { padding: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: 14 },
+  tagsContainer: { gap: 10 },
   tagCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -245,26 +239,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  tagName: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  tagCount: {
-    fontSize: 13,
-  },
-  tabsRow: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
+  tagName: { fontSize: 15, fontWeight: '700' },
+  tagCount: { fontSize: 13 },
+  tabsRow: { flexDirection: 'row', borderBottomWidth: 1 },
+  tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center' },
+  tabText: { fontSize: 14, fontWeight: '700' },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -274,30 +253,10 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
   },
-  userInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  userBio: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  followBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  followText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  noResults: {
-    padding: 40,
-    alignItems: 'center',
-  },
+  userInfo: { flex: 1, marginLeft: 12 },
+  userName: { fontSize: 16, fontWeight: '700' },
+  userBio: { fontSize: 13, marginTop: 2 },
+  followBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 8 },
+  followText: { color: '#FFF', fontSize: 13, fontWeight: '600' },
+  noResults: { padding: 40, alignItems: 'center' },
 });

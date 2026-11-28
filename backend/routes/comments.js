@@ -1,58 +1,25 @@
 const express = require('express');
 const pool = require('../config/database');
-const jwt = require('jsonwebtoken');
+const { authenticateToken } = require('../middleware/auth');
+const q = require('../utils/queries');
+const store = require('../utils/devStore');
 
 const router = express.Router();
-
-// Middleware pour vérifier le token JWT
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Invalid token' });
-    }
-    req.user = user;
-    next();
-  });
-};
 
 // Get comments for a post
 router.get('/:postId', async (req, res) => {
   try {
-    const postId = req.params.postId;
+    const postId = Number(req.params.postId);
 
-    // Pour le développement, retourner des données simulées
-    if (process.env.NODE_ENV === 'development') {
-      return res.json([
-        {
-          id: 1,
-          content: 'Super post !',
-          user: { username: 'User2', profile_picture: null },
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 2,
-          content: 'Merci pour le partage',
-          user: { username: 'User3', profile_picture: null },
-          created_at: new Date(Date.now() - 1800000).toISOString()
-        }
-      ]);
+    if (store.isDevFallback()) {
+      const list = store.comments
+        .filter((c) => c.post_id === postId)
+        .sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || a.id - b.id)
+        .map(store.formatComment);
+      return res.json(list);
     }
 
-    const [comments] = await pool.execute(`
-      SELECT c.*, u.username, u.profile_picture
-      FROM post_comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.post_id = ?
-      ORDER BY c.created_at ASC
-    `, [postId]);
-
+    const comments = await q.getComments(postId);
     res.json(comments);
   } catch (error) {
     console.error('Get comments error:', error);
@@ -63,37 +30,32 @@ router.get('/:postId', async (req, res) => {
 // Create comment
 router.post('/:postId', authenticateToken, async (req, res) => {
   try {
-    const postId = req.params.postId;
-    const { content } = req.body;
+    const postId = Number(req.params.postId);
+    const cleanContent = (req.body.content || '').trim();
     const userId = req.user.id;
 
-    if (!content) {
+    if (!cleanContent) {
       return res.status(400).json({ error: 'Content required' });
     }
 
-    // Pour le développement, retourner des données simulées
-    if (process.env.NODE_ENV === 'development') {
-      return res.json({
-        id: Math.floor(Math.random() * 1000),
-        content,
-        user: { username: req.user.username, profile_picture: null },
-        created_at: new Date().toISOString()
-      });
+    if (store.isDevFallback()) {
+      const newComment = {
+        id: store.genId(),
+        post_id: postId,
+        user_id: userId,
+        content: cleanContent,
+        created_at: new Date().toISOString(),
+      };
+      store.comments.push(newComment);
+      return res.status(201).json(store.formatComment(newComment));
     }
 
-    const [result] = await pool.execute(
-      'INSERT INTO post_comments (post_id, user_id, content) VALUES (?, ?, ?)',
-      [postId, userId, content]
-    );
+    if (!(await q.postExists(postId))) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
 
-    const [newComment] = await pool.execute(`
-      SELECT c.*, u.username, u.profile_picture
-      FROM post_comments c
-      JOIN users u ON c.user_id = u.id
-      WHERE c.id = ?
-    `, [result.insertId]);
-
-    res.status(201).json(newComment[0]);
+    const newComment = await q.createComment(postId, userId, cleanContent);
+    res.status(201).json(newComment);
   } catch (error) {
     console.error('Create comment error:', error);
     res.status(500).json({ error: 'Server error' });
@@ -103,8 +65,17 @@ router.post('/:postId', authenticateToken, async (req, res) => {
 // Delete comment
 router.delete('/:commentId', authenticateToken, async (req, res) => {
   try {
-    const commentId = req.params.commentId;
+    const commentId = Number(req.params.commentId);
     const userId = req.user.id;
+
+    if (store.isDevFallback()) {
+      const idx = store.comments.findIndex((c) => c.id === commentId && c.user_id === userId);
+      if (idx === -1) {
+        return res.status(404).json({ error: 'Comment not found or unauthorized' });
+      }
+      store.comments.splice(idx, 1);
+      return res.json({ message: 'Comment deleted successfully', id: commentId });
+    }
 
     const [result] = await pool.execute(
       'DELETE FROM post_comments WHERE id = ? AND user_id = ?',
@@ -115,7 +86,7 @@ router.delete('/:commentId', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'Comment not found or unauthorized' });
     }
 
-    res.json({ message: 'Comment deleted successfully' });
+    res.json({ message: 'Comment deleted successfully', id: commentId });
   } catch (error) {
     console.error('Delete comment error:', error);
     res.status(500).json({ error: 'Server error' });

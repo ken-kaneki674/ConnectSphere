@@ -3,7 +3,7 @@ const pool = require('../config/database');
 // Requêtes et mises en forme partagées entre les routes posts/comments/likes/users
 
 const POST_SELECT = `
-  SELECT p.id, p.user_id, p.content, p.image_path, p.created_at,
+  SELECT p.id, p.user_id, p.group_id, p.content, p.image_path, p.created_at,
          u.username, u.profile_picture,
          (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) AS likes_count,
          (SELECT COUNT(*) FROM post_comments WHERE post_id = p.id) AS comments_count,
@@ -12,17 +12,22 @@ const POST_SELECT = `
   JOIN users u ON p.user_id = u.id
 `;
 
-const formatPost = (row) => ({
-  id: row.id,
-  user_id: row.user_id,
-  content: row.content,
-  image_path: row.image_path,
-  created_at: row.created_at,
-  likes_count: Number(row.likes_count),
-  comments_count: Number(row.comments_count),
-  liked: Boolean(row.liked),
-  user: { id: row.user_id, username: row.username, profile_picture: row.profile_picture }
-});
+const formatPost = (row) => {
+  const liked = Boolean(row.liked);
+  return {
+    id: row.id,
+    user_id: row.user_id,
+    group_id: row.group_id || null,
+    content: row.content,
+    image_path: row.image_path,
+    created_at: row.created_at,
+    likes_count: Number(row.likes_count),
+    comments_count: Number(row.comments_count),
+    liked,
+    is_liked: liked,
+    user: { id: row.user_id, username: row.username, profile_picture: row.profile_picture }
+  };
+};
 
 const formatComment = (row) => ({
   id: row.id,
@@ -33,9 +38,10 @@ const formatComment = (row) => ({
   user: { id: row.user_id, username: row.username, profile_picture: row.profile_picture }
 });
 
-const getPosts = async (viewerId, where = '', params = []) => {
+const getPosts = async (viewerId, where = '', params = [], limit = null, offset = 0) => {
+  const limitClause = Number.isInteger(limit) && limit > 0 ? ` LIMIT ${limit} OFFSET ${Math.max(0, offset)}` : '';
   const [rows] = await pool.execute(
-    `${POST_SELECT} ${where} ORDER BY p.created_at DESC, p.id DESC`,
+    `${POST_SELECT} ${where} ORDER BY p.created_at DESC, p.id DESC${limitClause}`,
     [viewerId || 0, ...params]
   );
   return rows.map(formatPost);

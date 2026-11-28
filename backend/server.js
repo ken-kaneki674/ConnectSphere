@@ -11,6 +11,8 @@ const likeRoutes = require('./routes/likes');
 const messageRoutes = require('./routes/messages');
 const groupRoutes = require('./routes/groups');
 const userRoutes = require('./routes/users');
+const friendRoutes = require('./routes/friends');
+const reportRoutes = require('./routes/reports');
 
 const app = express();
 
@@ -20,12 +22,37 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
+// Rate limiting: generous for app browsing, stricter on auth endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 500,
 });
-app.use(limiter);
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 40,
+});
+app.use('/api', apiLimiter);
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+
+// API health & endpoints overview
+app.get('/api', (req, res) => {
+  res.json({
+    name: 'ConnectSphere API',
+    status: 'ok',
+    endpoints: [
+      '/api/auth',
+      '/api/posts',
+      '/api/comments',
+      '/api/likes',
+      '/api/messages',
+      '/api/groups',
+      '/api/users',
+      '/api/friends',
+      '/api/reports',
+    ],
+  });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -35,6 +62,8 @@ app.use('/api/likes', likeRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/groups', groupRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/friends', friendRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -48,7 +77,11 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`📚 API Documentation: http://localhost:${PORT}/api`);
+  });
+}
+
+module.exports = app;

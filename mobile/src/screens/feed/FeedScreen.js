@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -16,6 +17,8 @@ import { PostCard } from '../../components/PostCard';
 import { Avatar } from '../../components/Avatar';
 import { api } from '../../services/api';
 
+const PAGE_SIZE = 15;
+
 export const FeedScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
@@ -23,12 +26,16 @@ export const FeedScreen = ({ navigation }) => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [activeFilter, setActiveFilter] = useState('all');
 
   const loadPosts = useCallback(async () => {
     try {
-      const data = await api.getPosts();
-      setPosts(data || []);
+      const data = await api.getPosts({ limit: PAGE_SIZE, offset: 0 });
+      const list = data || [];
+      setPosts(list);
+      setHasMore(list.length >= PAGE_SIZE);
     } catch (e) {
       console.log('Error loading posts', e);
     } finally {
@@ -37,9 +44,30 @@ export const FeedScreen = ({ navigation }) => {
     }
   }, []);
 
-  useEffect(() => {
-    loadPosts();
-  }, [loadPosts]);
+  const loadMorePosts = async () => {
+    if (loadingMore || !hasMore || loading) return;
+    setLoadingMore(true);
+    try {
+      const next = await api.getPosts({ limit: PAGE_SIZE, offset: posts.length });
+      if (Array.isArray(next) && next.length > 0) {
+        setPosts((prev) => {
+          const existingIds = new Set(prev.map((p) => p.id));
+          return [...prev, ...next.filter((p) => !existingIds.has(p.id))];
+        });
+        setHasMore(next.length >= PAGE_SIZE);
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPosts();
+    }, [loadPosts])
+  );
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -56,6 +84,15 @@ export const FeedScreen = ({ navigation }) => {
             : p
         )
       );
+    }
+  };
+
+  const handleOpenUser = (targetUser) => {
+    if (!targetUser?.id) return;
+    if (targetUser.id === user?.id) {
+      navigation.navigate('Profile');
+    } else {
+      navigation.navigate('UserProfile', { userId: targetUser.id, user: targetUser });
     }
   };
 
@@ -138,6 +175,8 @@ export const FeedScreen = ({ navigation }) => {
             <PostCard
               post={item}
               onLike={handleLike}
+              onUserPress={handleOpenUser}
+              onDeleted={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
               onPress={() => navigation.navigate('PostDetail', { postId: item.id, post: item })}
               onCommentPress={() => navigation.navigate('PostDetail', { postId: item.id, post: item })}
             />
@@ -148,6 +187,13 @@ export const FeedScreen = ({ navigation }) => {
               onRefresh={onRefresh}
               tintColor={theme.colors.primary}
             />
+          }
+          onEndReached={loadMorePosts}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={
+            loadingMore ? (
+              <ActivityIndicator style={{ marginVertical: 16 }} color={theme.colors.primary} />
+            ) : null
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -174,9 +220,7 @@ export const FeedScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   createPrompt: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,9 +239,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 10,
     borderWidth: 1,
   },
-  imageIconBtn: {
-    padding: 6,
-  },
+  imageIconBtn: { padding: 6 },
   filterRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
@@ -210,24 +252,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
   },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 15,
-    marginTop: 12,
-  },
+  filterText: { fontSize: 13, fontWeight: '600' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyText: { fontSize: 15, marginTop: 12 },
   fab: {
     position: 'absolute',
     bottom: 20,

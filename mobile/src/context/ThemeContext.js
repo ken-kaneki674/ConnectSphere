@@ -1,5 +1,8 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme as defaultTheme } from '../config/theme';
+
+const THEME_STORAGE_KEY = '@connectsphere_theme';
 
 const ThemeContext = createContext({
   theme: defaultTheme,
@@ -10,8 +13,26 @@ const ThemeContext = createContext({
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(true);
 
+  useEffect(() => {
+    const loadTheme = async () => {
+      try {
+        const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        if (stored !== null) {
+          setIsDark(stored === 'dark');
+        }
+      } catch (e) {
+        console.log('Error reading theme preference', e);
+      }
+    };
+    loadTheme();
+  }, []);
+
   const toggleTheme = () => {
-    setIsDark((prev) => !prev);
+    setIsDark((prev) => {
+      const next = !prev;
+      AsyncStorage.setItem(THEME_STORAGE_KEY, next ? 'dark' : 'light').catch(() => {});
+      return next;
+    });
   };
 
   const currentTheme = {

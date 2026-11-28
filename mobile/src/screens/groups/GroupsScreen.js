@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { Header } from '../../components/Header';
@@ -17,9 +19,10 @@ export const GroupsScreen = ({ navigation }) => {
   const { theme } = useTheme();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' or 'my'
 
-  const loadGroups = async () => {
+  const loadGroups = useCallback(async () => {
     try {
       const data = await api.getGroups();
       setGroups(data || []);
@@ -27,16 +30,21 @@ export const GroupsScreen = ({ navigation }) => {
       console.log('Error loading groups', e);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    loadGroups();
   }, []);
 
-  const handleJoinToggle = async (groupId) => {
-    const updated = await api.toggleJoinGroup(groupId);
-    setGroups((prev) => prev.map((g) => (g.id === groupId ? updated : g)));
+  useFocusEffect(
+    useCallback(() => {
+      loadGroups();
+    }, [loadGroups])
+  );
+
+  const handleJoinToggle = async (group) => {
+    const updated = await api.toggleJoinGroup(group.id, group.is_member);
+    if (updated) {
+      setGroups((prev) => prev.map((g) => (g.id === group.id ? updated : g)));
+    }
   };
 
   const displayedGroups = groups.filter((g) => {
@@ -69,10 +77,7 @@ export const GroupsScreen = ({ navigation }) => {
         <View style={styles.filterTabs}>
           <TouchableOpacity
             onPress={() => setFilter('all')}
-            style={[
-              styles.tab,
-              filter === 'all' && { backgroundColor: theme.colors.primary },
-            ]}
+            style={[styles.tab, filter === 'all' && { backgroundColor: theme.colors.primary }]}
           >
             <Text
               style={[
@@ -86,10 +91,7 @@ export const GroupsScreen = ({ navigation }) => {
 
           <TouchableOpacity
             onPress={() => setFilter('my')}
-            style={[
-              styles.tab,
-              filter === 'my' && { backgroundColor: theme.colors.primary },
-            ]}
+            style={[styles.tab, filter === 'my' && { backgroundColor: theme.colors.primary }]}
           >
             <Text
               style={[
@@ -103,7 +105,6 @@ export const GroupsScreen = ({ navigation }) => {
         </View>
       </View>
 
-      {/* Groups List */}
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator size="large" color={theme.colors.primary} />
@@ -112,11 +113,21 @@ export const GroupsScreen = ({ navigation }) => {
         <FlatList
           data={displayedGroups}
           keyExtractor={(item) => String(item.id)}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                loadGroups();
+              }}
+              tintColor={theme.colors.primary}
+            />
+          }
           renderItem={({ item }) => (
             <GroupCard
               group={item}
               onPress={() => navigation.navigate('GroupDetail', { group: item, onUpdate: loadGroups })}
-              onJoinToggle={() => handleJoinToggle(item.id)}
+              onJoinToggle={() => handleJoinToggle(item)}
             />
           )}
           ListEmptyComponent={
@@ -137,62 +148,16 @@ export const GroupsScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topSection: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  screenTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  newBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 4,
-  },
-  newBtnText: {
-    color: '#FFF',
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  filterTabs: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  tab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 14,
-    marginTop: 12,
-  },
+  container: { flex: 1 },
+  topSection: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  screenTitle: { fontSize: 22, fontWeight: '800' },
+  newBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, gap: 4 },
+  newBtnText: { color: '#FFF', fontSize: 13, fontWeight: '700' },
+  filterTabs: { flexDirection: 'row', gap: 10 },
+  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  tabText: { fontSize: 14, fontWeight: '700' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60 },
+  emptyText: { fontSize: 14, marginTop: 12 },
 });

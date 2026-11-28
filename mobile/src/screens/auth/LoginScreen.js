@@ -18,7 +18,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export const LoginScreen = ({ navigation }) => {
   const { theme } = useTheme();
-  const { login } = useAuth();
+  const { login, demoLogin } = useAuth();
   const insets = useSafeAreaInsets();
 
   const [username, setUsername] = useState('');
@@ -46,10 +46,16 @@ export const LoginScreen = ({ navigation }) => {
     }
   };
 
-  const handleQuickDemo = () => {
+  const handleQuickDemo = async () => {
     setUsername('demo');
     setPassword('demo');
-    handleLogin('demo', 'demo');
+    setError('');
+    setLoading(true);
+    const res = await demoLogin();
+    setLoading(false);
+    if (!res.success) {
+      setError(res.error || 'Erreur lors de la connexion démo');
+    }
   };
 
   return (

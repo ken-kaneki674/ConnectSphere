@@ -7,12 +7,22 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { Header } from '../../components/Header';
 import { Avatar } from '../../components/Avatar';
+
+const AVATAR_PRESETS = [
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200',
+  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
+  'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200',
+];
 
 export const EditProfileScreen = ({ navigation }) => {
   const { theme } = useTheme();
@@ -21,16 +31,29 @@ export const EditProfileScreen = ({ navigation }) => {
   const [username, setUsername] = useState(user?.username || '');
   const [bio, setBio] = useState(user?.bio || '');
   const [profilePic, setProfilePic] = useState(user?.profile_picture || '');
+  const [saving, setSaving] = useState(false);
 
-  const handleSave = () => {
-    updateUser({
-      username: username.trim(),
-      bio: bio.trim(),
-      profile_picture: profilePic.trim() || null,
-    });
-    Alert.alert('Succès', 'Profil mis à jour avec succès !', [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+  const handleSave = async () => {
+    if (!username.trim()) {
+      Alert.alert('Erreur', "Le nom d'utilisateur ne peut pas être vide.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateUser({
+        username: username.trim(),
+        bio: bio.trim(),
+        profile_picture: profilePic.trim() || null,
+      });
+      Alert.alert('Succès', 'Profil mis à jour avec succès !', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    } catch (e) {
+      Alert.alert('Erreur', e?.message || 'Impossible de mettre à jour le profil');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -49,19 +72,26 @@ export const EditProfileScreen = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.avatarSection}>
           <Avatar uri={profilePic} name={username} size={90} />
-          <TouchableOpacity
-            onPress={() =>
-              setProfilePic(
-                'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200'
-              )
-            }
-            style={[styles.changePicBtn, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}
-          >
-            <Ionicons name="camera-outline" size={16} color={theme.colors.primaryLight} />
-            <Text style={[styles.changePicText, { color: theme.colors.primaryLight }]}>
-              Changer photo
-            </Text>
-          </TouchableOpacity>
+          <Text style={[styles.presetTitle, { color: theme.colors.textSecondary }]}>
+            Choisir un avatar rapide :
+          </Text>
+          <View style={styles.presetsRow}>
+            {AVATAR_PRESETS.map((url, idx) => (
+              <TouchableOpacity
+                key={idx}
+                onPress={() => setProfilePic(url)}
+                style={[
+                  styles.presetBtn,
+                  {
+                    borderColor: profilePic === url ? theme.colors.primaryLight : theme.colors.border,
+                    borderWidth: profilePic === url ? 2 : 1,
+                  },
+                ]}
+              >
+                <Image source={{ uri: url }} style={styles.presetImg} />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -83,7 +113,7 @@ export const EditProfileScreen = ({ navigation }) => {
           />
 
           <Text style={[styles.label, { color: theme.colors.textSecondary }]}>
-            URL de la photo de profil
+            URL personnalisée de photo de profil
           </Text>
           <TextInput
             value={profilePic}
@@ -95,9 +125,14 @@ export const EditProfileScreen = ({ navigation }) => {
 
           <TouchableOpacity
             onPress={handleSave}
+            disabled={saving}
             style={[styles.saveBtn, { backgroundColor: theme.colors.primary }]}
           >
-            <Text style={styles.saveBtnText}>Enregistrer les modifications</Text>
+            {saving ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={styles.saveBtnText}>Enregistrer les modifications</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -106,48 +141,16 @@ export const EditProfileScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scroll: {
-    padding: 16,
-  },
-  avatarSection: {
-    alignItems: 'center',
-    marginVertical: 16,
-  },
-  changePicBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 20,
-    borderWidth: 1,
-    marginTop: 10,
-  },
-  changePicText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  card: {
-    padding: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    marginBottom: 6,
-    marginTop: 10,
-  },
-  input: {
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    fontSize: 15,
-  },
+  container: { flex: 1 },
+  scroll: { padding: 16 },
+  avatarSection: { alignItems: 'center', marginVertical: 14 },
+  presetTitle: { fontSize: 12, marginTop: 12, marginBottom: 8 },
+  presetsRow: { flexDirection: 'row', gap: 10 },
+  presetBtn: { width: 46, height: 46, borderRadius: 23, overflow: 'hidden' },
+  presetImg: { width: '100%', height: '100%' },
+  card: { padding: 20, borderRadius: 16, borderWidth: 1 },
+  label: { fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: 10 },
+  input: { height: 48, borderRadius: 12, paddingHorizontal: 14, borderWidth: 1, fontSize: 15 },
   textArea: {
     minHeight: 90,
     borderRadius: 12,
@@ -163,9 +166,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 24,
   },
-  saveBtnText: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  saveBtnText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
 });
